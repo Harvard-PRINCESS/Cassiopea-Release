@@ -1,0 +1,39 @@
+// file: kernel/aarmv7/exception.S
+
+//
+// Macro to determine if dispatcher is disabled.
+//
+// pc and disp arguments are unmodified.
+// out contains result
+//
+; .macro disp_is_disabled disp, pc, out
+;     // disp->disabled || (disp->crit_pc_lo <= pc && pc < disp->crit_pc_hi)
+;     ldrb    \out, [\disp, #OFFSETOF_DISP_DISABLED]
+;     cmp     \out, #1
+;     bhs     0f                      // disp->disabled >= 0      | disabled
+;                                     // disp->disabled = false
+;     ldr     \out, [\disp, #OFFSETOF_DISP_CRIT_PC_LOW]
+;     cmp     \out, \pc
+;     movhi   \out, #0
+;     bhi     0f                      // disp->crit_pc_low > pc   | enabled
+;     ldr     \out, [\disp, #OFFSETOF_DISP_CRIT_PC_HIGH]
+;     cmp     \pc, \out
+;     movhs   \out, #0                // pc >= disp->crit_pc_high | enabled
+;     movlo   \out, #1                // pc <  disp->crit_pc_high | disable
+; 0:
+; .endm
+
+    // disp->disabled || (disp->crit_pc_lo <= pc && pc < disp->crit_pc_hi)
+    ldrb    r1, [r2, #OFFSETOF_DISP_DISABLED]
+    cmp     r1, #1
+    bhs     0f                      // disp->disabled >= 0      | disabled
+                                    // disp->disabled = false
+    ldr     r1, [r2, #OFFSETOF_DISP_CRIT_PC_LOW]
+    cmp     r1, lr
+    movhi   r1, #0
+    bhi     0f                      // disp->crit_pc_low > pc   | enabled
+    ldr     r1, [r2, #OFFSETOF_DISP_CRIT_PC_HIGH]
+    cmp     lr, r1
+    movhs   r1, #0                // pc >= disp->crit_pc_high | enabled
+    movlo   r1, #1                // pc <  disp->crit_pc_high | disable
+0:

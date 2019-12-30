@@ -1,0 +1,334 @@
+
+Grouper is a tool for assembling small synthesis blocks into whole
+procedures.
+
+This ends up being substantially more than just string concatenation
+of the block outputs, because it requires reasoning about the block
+specifications and dealing with our various block generating tools.
+Some of the tools take specifications (in the form of preconditions
+and postconditions) as inputs; some have other specifications and
+produce pre/postconditions as outputs along with the block text.
+Connecting these together by hand requires a tedious amount of
+boilerplate. Furthermore, in order to avoid noise in block
+specifications (which can impede block generation) we want to
+explicitly control the frame available to each block.
+
+Grouper is intended to be able to drive the following block generation
+tools (details on each can be found in ecosystem.txt):
+   - alewife/cassiopeia for block generation by synthesis;
+   - nautilus for extracting procedure call blocks from a compiler;
+   - maybe-also-nautilus for producing procedure prologue/epilogue
+     blocks;
+   - grayling for compiling context switch (bulk register move)
+     specifications;
+   - can-o-tuna for extracting hardcoded blocks directly from machine
+     descriptions;
+plus
+   - it may also need/want to be able to use smelt to generate
+     cassiopeia elements (particularly but not only choices of
+     registers);
+   - and it may also need to be able to use dorado to generate/deduce
+     constants;
+   - and it knows how to use can-o-tuna to get strings or templates
+     for various builtin functionality.
+
+
+Preliminaries
+-------------
+
+A grouper file (*.grr) contains the specifications for one or more
+procedures. A procedure is a piece of assembly language code that can
+be called from other code to do some complete unit of work, like a
+function in C. A procedure may have arguments and/or return values,
+which can be placed either according to the platform calling
+conventions for C code or according to a custom specification. (Or
+potentially other calling conventions, given tooling to handle them.)
+
+Each procedure is composed of a series of blocks. A block is a
+sequence of assembly instructions, in our environment often but not
+necessarily a single basic block (a non-branching, non-looping
+sequence with one entrance and one or perhaps two exits) whose
+specification (but in general not implementation) can be expressed in
+some machine-independent fashion.
+
+Grouper understands the following kinds of blocks:
+   - a procedure prologue specified by a declaration in another language
+   - a procedure epilogue specified by a declaration in another language
+   - a call to another procedure specified by an invocation in another language
+   - an arbitrary step specified by pre- and post-conditions
+   - a custom block specified by an external mechanism
+
+These have the following characteristics:
+
+1. Prologues
+   A prologue block is specified as a procedure/function declaration
+in another language (normally C); the declaration in grouper binds a
+grouper-level symbolic value to each parameter, and optionally also
+symbolic values for the return address, stack pointer, and/or a list
+of local variables to allocate stack space for. Invoking the prologue
+generation tool produces an assembly block that creates the stack
+frame for the procedure, and also a mapping from the grouper-level
+symbolic values to machine-level locations. This mapping functions as
+a postcondition for the prologue block, but has a more stylized form
+allowing grouper to reason about it more explicitly. The precondition
+for the prologue block is implicit; for the time being at least we do
+not materialize it.
+
+2. Epilogues
+   An epilogue block is inherently tied to its corresponding prologue
+block, so prologues and epilogues are specified together. The
+declaration in grouper binds a grouper-level symbolic value for the
+return value, if any, and optionally also for the return address.
+(And stack pointer? XXX.) Invoking the prologue generation tool also
+produces an assembly block that clears the stack frame for the
+procedure and does a procedure return, and a mapping from the
+grouper-level symbolic values to machine-level locations. This mapping
+functions as a precondition for the epilogue block, but has a more
+stylized form allowing grouper to reason about it more explicitly. The
+postcondition for the epilogue block is implicit; for the time being
+at least we do not materialize it.
+
+3. Calls
+   A call block is specified as a procedure call in another language
+(normally C); the declaration in grouper binds a grouper-level
+symbolic value to each argument and to the return value. Invoking the
+call block generator produces a block of assembly code and, like a
+prologue or epilogue, maps of symbolic values to locations: one as its
+precondition, one as its postcondition. These are the locations in
+which the values for the arguments must be placed before entering the
+call block, and the location in which to find the return value. The
+call block generator also produces a list of registers destroyed by
+the call.
+
+4. Steps
+   A step block is specified as a pre- and post-condition; these are
+taken directly from the grouper logic, possibly adjusted by framing
+directives, and fed to alewife then cassiopeia (or some other
+comparable tool) for synthesis. This produces a block of assembly
+code.
+
+5. Custom blocks
+   A custom block is specified externally (e.g. a *.gry file for
+grayling) and referenced from grouper. The premise is that the
+specification specifies the block, but the block has some number of
+input and output values; thus, the invocation is parameterized by the
+locations in which to find or place those values. This serves as the
+pre- and post-condition for interfacing to grouper. (XXX: what about
+destroyed registers? Some grayling blocks require scratch registers.
+This will probably become clearer when I finish implementing that
+feature.) (Also there may need to be more elements of the arguments in
+the future.)
+
+This is not necessarily a complete list, as there might be other kinds
+of blocks we want with materially different interfacing requirements.
+
+The way things are set up depends on the following assumption about
+framing and alewife/casp: no block changes state elements that are not
+mentioned in either the precondition or postcondition or an explicit
+"allowed to destroy" list.
+
+
+Language
+--------
+
+As mentioned above, a grouper input file contains zero or more
+procedure specifications. These can be parameterized -- the parameters
+are NOT the procedure arguments, but values to be handed to grouper
+when asked to instantiate the procedure; for example, for some
+OS-level assembly elements the exact external name of the procedure
+varies with the target architecture; or some constants might be passed
+in after deducing/synthesizing them elsewhere.
+
+The language will have the following elements:
+
+   constants k
+   variables x y
+   types t
+   expressions e
+   framing-statements f
+   declarations d
+   top-statements s
+   procedures p
+
+where
+
+   true, false \in k
+
+   t ::= bool | string | bv | register | pointer | region | symbol
+		| list t | map t1 -> t2
+
+   e ::= k | x | <alewife expressions> | e1 |-> e2 | e1 (*) e2
+
+   f ::=
+	use x
+	add x: e
+	replace x: e
+	forget x
+	call [x1 = ] x (e1...en) from k replacing x2
+
+   s ::= skip | s1; s2
+	| step f1...fn
+	| custom x1...xn = x e1...em from k	# invoke x() from spec file k
+	| loop s1		# infinite loop, loop code comes from tuna
+
+   d ::=
+	name = e		# string: name of output procedure
+	globl = e		# boolean: add .globl or equivalent (via tuna)
+	leaf = e		# boolean: this procedure makes calls
+	var x: t
+	const x: t from k
+	place x: t from k	# may not actually be different from const
+	linkage y [with returnaddr y0] =
+		   x (x1...xn) [with returnaddr x0]
+		from k		# prologue/epilogue
+	init f1...fn		# "add" only
+
+   p ::= procedure x (x1: t1 ... xn: tn) d1...dn body s
+
+
+The bool type is for logic; the string type is for names of things
+that need external names (procedures, labels). The register type is
+hopefully the same as the alewife "loc" type. A pointer is a pair of
+a region (memory region) and a bitvector offset; a symbol is not a
+pointer but can have its address loaded to make a pointer.
+
+The e1 |-> e2 syntax is for points-to assertions. The (*) operator is
+the star from separation logic.
+
+There's an environment associated with a procedure, which holds a
+collection of assertions (implicitly joined together with (*)) that
+are supposed to be true. The "use" framing statement imports elements
+from that collection into the precondition of a step block. The "add"
+and "replace" framing statements export new assertions; these are the
+postconditions of a step block. The "forget" framing statement
+discards assertions. "call" appears in blocks that are call blocks
+(but not step blocks) and gives the call being made.
+
+The "init" block gives the initial precondition. This will usually
+bind variables to the locations provided by the prologue, if there is
+one; if there isn't, it will generally bind variables to
+description-supplied registers.
+
+Currently as the existing grouper files have been written, you can
+(and must) use symbolic values as well to bring them into scope, and
+can forget them to allow them to be destroyed. This is unsound and
+ideally you would just import assertions and automatically get the
+values. I need to go through this in detail again (probably in Coq)
+and figure out exactly how it should work -- that this is separation
+logic and the framing actions are separation logic framing (or any
+kind of framing per se) did not become clear until after I'd written
+down things in the this, discussed it with Eric, and let it gel for a
+week or two. (But since Crystal's started writing grouper files, I
+want to get this document out first and get more comments on it.)
+
+The variables bound by the linkage (prologue/epilogue) declaration are
+locations (registers or memory blocks), not machine values. I am
+thinking about syntactic sugar to allow binding arguments directly to
+values, but this also generates assertions that have to be manipulated
+later it's not necessarily good. Also binding the return value
+location to a value up front gets ...weird.
+
+
+Preliminary typing rules
+------------------------
+
+We'll have a type environment G, and an assertion library A, and use
+these judgments:
+
+  |- k: t
+  G |- e: t
+  G, A |- f
+  G, A |- f /\ G, A -> G', A'	(updates G and/or A)
+  G, A |- s
+  G, A |- s /\ G, A -> G', A'	(updates G and/or A)
+  G, A |- d
+  G, A |- d /\ G, A -> G', A'	(updates G and/or A)
+  |- p
+
+the meaning of all of which is hopefully obvious.
+
+The expression rules are all from alewife and/or obvious, and not
+included here. I've also left out some obvious administrative rules.
+
+
+   A[x] = e  G |- e: bool
+   ------------------------
+   G, A |- use x
+
+   x \notin A    G |- e: bool
+   ------------------------
+   G, A |- add x: e /\ A -> A[x -> e]
+
+   x \in A    G |- e: bool
+   ------------------------
+   G, A |- replace x: e1 /\ A -> A[x -> e1]
+
+   x \in A
+   ------------------------
+   G, A |- forget x /\ A -> A delete x
+
+   |- k: string   x defined by file k with params t1...tn, returns t0
+   forall i, G |- ei: ti
+   A[x2] = r |-> _
+   G |- x1 : t0
+   ------------------------
+   G, A |- call x1 = x (e1...en) from k /\ A -> A[x2 -> (r |-> x1)]
+    ... or something like that
+
+   G, A |- f1...f2 /\ A -> A'
+   G, A' |- f3 /\ A' -> A''
+   ------------------------
+   G, A |- f1...f3 /\ A -> A''
+
+   G, A |- f1...f3 /\ A -> A''
+   ------------------------
+   G, A |- step f1...f3 /\ A -> A''
+
+   |- k: string   x defined by file k with params 1...m, returns 1...n
+   forall i, G |- ei: register
+   forall i, G |- xi: register
+   ------------------------
+   G, A |- custom x1...xn = x e1...em from k
+
+   G, A |- s1		# may not change G or A
+   ------------------------
+   G, A |- loop s1
+
+   G |- e: string
+   ------------------------
+   G, A |- name = e
+
+   G |- e: bool
+   ------------------------
+   G, A |- globl = e
+   G, A |- leaf = e
+
+   x \notin G
+   ------------------------
+   G, A |- var x: t /\ G -> G[x -> t]
+
+   |- k: string    file k defines x with type t
+   ------------------------
+   G, A |- const x: t /\ G -> G[x -> t]
+
+   |- k: string    file k defines x with type t
+   t = register /\ t = region
+   ------------------------
+   G, A |- place x: t /\ G -> G[x -> t]
+
+   |- k: string    file k defines x with params t1...tn and return type t0
+   ------------------------
+   G, A |- linkage y with returnaddr y0 = x(x1...xn) with returnaddr x0 from k
+    /\ G -> G[forall i, xi -> ti][y -> t0][y0 -> bitvector][x0 -> bitvector]
+
+   G, A |- f1...f3 /\ A -> A''
+   ------------------------
+   G, A |- init f1...f3 /\ A -> A''
+
+   G0 = {}
+   G1 = G0[forall i, xi -> ti]
+   G1, {} |- d1...dn /\ G1, {} -> G2, A2
+   G2, A2 |- s /\ G2, A2 -> G3, A3
+   forall e \in A3, |- e	# maybe?
+   ------------------------
+   |- procedure x (x1: t1, ..., xn: tn) d1...dn body s

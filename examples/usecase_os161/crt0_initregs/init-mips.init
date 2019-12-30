@@ -1,0 +1,2 @@
+(memory mem_gp: 32 bit 1 len 32 ref with lbl_gp)
+(r28 = 0xffffffff)

@@ -1,0 +1,4 @@
+(r5 = 0x00000000)
+(* (r5 = 10) gets the other case *)
+
+

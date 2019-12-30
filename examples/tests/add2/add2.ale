@@ -1,0 +1,8 @@
+bind b: ghost_bool
+bind biv: ghost_vec
+block add2 {
+  pre: 
+	(biv = get_cont(areareg))
+  post:
+    loaded_add2(biv)
+}

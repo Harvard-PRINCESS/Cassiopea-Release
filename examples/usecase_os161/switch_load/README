@@ -1,0 +1,5 @@
+switch_load
+
+This loads the new stack pointer from the second argument to
+switchframe_switch.
+

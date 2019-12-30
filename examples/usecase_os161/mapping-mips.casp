@@ -1,0 +1,101 @@
+(********** alewife mappings **********)
+
+module cpu_irqoff{
+  (* include "mips.casp"; *)
+  def interrupts_are_on -> bool = *cp0_12_ie == 0b1
+  reg-modify: r4
+}
+
+module initregs {
+	(* include "../usecase_machines/mips.casp"; *)
+	letstate mem_gp: 32 bit 1 len 32 ref memory with lbl_gp
+	def crt0_additional_initialization -> bool = *r28 (*gp*) == lbl_gp
+	let crt0_argc_reg: gpreg = r1
+	let crt0_argv_reg: gpreg = r2
+	let crt0_environ_reg: gpreg = r3
+}
+
+module savevals {
+	(* include "../usecase_machines/mips.casp"; *)
+	def readlbl l: 32 label -> word = fetch[l, 32]
+	let crt0_argv_reg: gpreg = r2
+	let crt0_environ_reg: gpreg = r3
+}
+
+module longjmp_ret {
+	(* include "../usecase_machines/mips.casp"; *)
+	let reg_arg_retval: gpreg = r4
+	let reg_retval: gpreg = r5
+}
+
+module setjmp_ret {
+	(* include "../usecase_machines/mips.casp"; *)
+	let reg_retval: gpreg = r4	
+}
+
+module syscalls_loadnum {
+	(* include "../usecase_machines/mips.casp"; *)
+	let syscall_callnum_reg: gpreg = r6
+	let callnum: word = 0x00000010 (* CALLNUM for syscalls_loadnum *)
+}
+
+module l2cache_wbinv_vaddr {
+	let vaddr_reg: 32 bit loc = r4
+}
+
+module mmu_setasid {
+	(* note: this is 8 on mips32 and 6 on mips-I and sy161 *)
+	let asidsize: int = 8
+	let reg_arg_asid: 32 bit loc = r4
+	def mmu_asid -> 8(*asidsize*) bit = *cp0_10_asid
+	reg-modify: r2
+}
+
+module mmu_setptbase {
+	let reg_arg_ptbase: 32 bit loc = r4
+	def ptbase_aligned addr: 32 bit -> bool =
+	   (addr & 0x007fffff) == 0x00000000
+        def mmu_ptbase -> 32 bit =
+           bv_to_len(32, *cp0_4_base) << 0x00000017 (*23*)
+	reg-modify: cp0_4_badvaddr
+}
+
+module mmu_makepte {
+	let page_mask: 32 bit = 0xfffff000
+	let has_exec_perms: bool = false  (* only exists in later mips *)
+
+	let reg_arg_paddr: 32 bit loc = r4
+	let reg_arg_writable: 32 bit loc = r5
+	let reg_arg_executable: 32 bit loc = r6
+	let reg_arg_global: 32 bit loc = r3 (* XXX should be r7 *)
+	let reg_result: 32 bit loc = r2
+
+	def page_aligned addr: 32 bit -> bool = (addr & page_mask) == addr
+
+	(* mips-I and System/161 *)
+	def pte_paddr      pte: 32 bit -> 32 bit = pte & page_mask
+	def pte_executable pte: 32 bit -> bool = true
+	def pte_writable   pte: 32 bit -> bool = pte[10]
+	def pte_valid      pte: 32 bit -> bool = pte[9]
+	def pte_global     pte: 32 bit -> bool = pte[8]
+	def pte_wellformed pte: 32 bit -> bool =
+            pte[11] == false (* cached *) && pte[0:8] == 0x00 (* reserved *)
+
+	(* mips32r1 *)
+(*
+	def pte_paddr      pte: 32 bit -> 32 bit = (pte << 6) & page_mask
+	def pte_executable pte: 32 bit -> bool = true
+	def pte_writable   pte: 32 bit -> bool = pte[2]
+	def pte_valid      pte: 32 bit -> bool = pte[1]
+	def pte_global     pte: 32 bit -> bool = pte[0]
+	def pte_wellformed pte: 32 bit -> bool =
+            pte[3:6] == 0b011 (* cached *)
+*)
+
+	(* let it trash the args *)
+	reg-modify: r4 r5 r6 (*r7*)r3
+}
+
+module switch_any {
+	include "mapping-mips-switch-shared.casp";
+}

@@ -1,0 +1,22 @@
+require value dispreg: reg
+require value pcreg: reg
+require value outreg: reg
+
+require function disp_crit_low: () word
+require function disabled_flgF: () bool
+require function critlow_check: (word, word) bool
+require function critlow_flgT: () bool
+require function critlow_flgF: () bool
+require function critlow_resT: (reg, word) bool
+require function critlow_resF: (reg, word) bool
+
+block disp_check_low {	
+	let mp: ptr = disp_crit_low ()
+	let outbv: vec = read[mp]
+	let b_crit: bool = critlow_check(outbv, *pcreg)
+
+	pre: ( *dispreg == mp ) && disabled_flgF()
+	post:
+		( !b_crit || (critlow_flgT() && critlow_resT(outreg, outbv)) ) &&
+		( b_crit || (critlow_flgF() && critlow_resF(outreg, outbv)) )
+}

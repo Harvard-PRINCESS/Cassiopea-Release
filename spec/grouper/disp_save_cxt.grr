@@ -1,0 +1,59 @@
+# grouper file for dispatcher save context 
+
+proc disp_save_cxt () {
+	
+	# declare the locations we can refer to: registers and linker symbols
+	places {
+		register register_list_ptr;
+		register cpsr_reg;
+		register pc_reg;
+		list(register) disp_save_regs;	
+	}
+
+	state {
+		var regls: pointer _;
+		var cpsrv: pointer _;
+		var pcv: pointer _;
+	}
+
+   # initial state - pre condition
+	init {
+		add Cregls: *regls = *register_list_ptr;
+	}
+
+	body {
+		# mrs r1, cpsr
+		step {
+			use cpsrv, cpsr_reg;
+			add Ccpsr: *cpsrv = *cpsr_reg;
+		}
+
+		# adr r2, disp_save_context_resume
+		# disp_save_context_resume : bx lr
+		step {
+			use pc_reg;
+			add Cpc: *pc_reg = *pcv;
+		}
+
+		# stmib r0, {r0-r14}
+		cxt_switch {
+			use Cregls, regls, disp_save_regs;
+			# post condition: cxt stored in the memory
+			add Msave: 
+				forall r in disp_save_regs, M[*regls+ioffset] = *r;
+		}
+
+		# str r1, [r0]
+		cxt_switch {
+			use Cregls, regls, cpsrv;
+			add Mcpsr: M[*regls] = *cpsrv;
+		}
+
+		# str r2, [r0, # (" XTR(PC_REG) "  * 4)]
+		cxt_switch {
+			use Cregls, pc_reg;
+			add Mpc: M[*regls+pcoffset] = *pc_reg;
+		}
+	}
+
+}

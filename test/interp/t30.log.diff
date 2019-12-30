@@ -1,0 +1,16 @@
+--- t30.log.good	2019-12-16 13:59:49.418496036 -0800
++++ t30.log	2019-12-16 14:12:09.861932127 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t30.prog with start state t30.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t30.prog with start state t30.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -24,4 +26,4 @@
+ Read/Write register sets for each instruction: 
+ rd: 
+ wt: r
+-	Execution Time: 0.000153s
++	Execution Time: 0.000114s

@@ -1,0 +1,16 @@
+--- t24.log.good	2019-12-16 13:59:49.414496083 -0800
++++ t24.log	2019-12-16 14:12:09.785932093 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t24.prog with start state t24.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t24.prog with start state t24.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -239,4 +241,4 @@
+ wt: R14_svc
+ rd: CPSR R14_svc
+ wt: CPSR PC
+-	Execution Time: 0.014414s
++	Execution Time: 0.014549s

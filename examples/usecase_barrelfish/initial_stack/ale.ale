@@ -1,0 +1,14 @@
+require value stackreg: reg
+require value basereg: reg
+require value kernel_stack_size: word
+require value kernel_stack: word
+require value STACKLEN: int
+require function check_base: (word) bool
+require function get_stack: (word, word) word
+
+block initial_stack {
+	region stack: wordsize bit STACKLEN len wordsize ref
+	let base: word = *basereg
+	pre: check_base(base) && get_stack(base, kernel_stack) == [stack, 0]
+	post: *stackreg == [stack, 0] + kernel_stack_size
+}

@@ -1,0 +1,6 @@
+(extern lbl_argv)
+(extern lbl_environ)
+(LDR_label R3 lbl_argv 0b1110)
+(STR_imm R1 R3 0x000 0b1110)
+(LDR_label R4 lbl_environ 0b1110)
+(STR_imm R2 R4 0x000 0b1110)

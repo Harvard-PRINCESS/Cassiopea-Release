@@ -1,0 +1,4 @@
+(LW r4 r28 0x0000)
+(SLTU r4 r5 r4)
+
+(* (SLTU r2 r5 r4) *)

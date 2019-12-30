@@ -1,0 +1,152 @@
+(*
+ * Library for cache control modeling.
+ *)
+
+(*
+ * XXX this file ought to be able to be machine-independent but it's
+ * limited to 32-bit targets due to there being no way to write
+ * size-independent bitvector constants.
+ *)
+
+(*
+ * We model each separate cache (icache, dcache, L2 cache, L3 cache) as
+ * two cache entries ("blue" and "green"), each of which can notionally
+ * be in one of the following states:
+ *     present and dirty
+ *     present and clean
+ *     absent and valid
+ *     absent and invalid
+ *
+ * An entry is present and dirty if there is data in the cache and it has
+ * not yet been written back to the next cache layer. An entry is present
+ * and clean if there is data in the cache but it is the same data as
+ * seen by the next layer down. An entry is absent and valid if there is
+ * no data in the cache but the data in the corresponding entry in the
+ * next (or further) layer down is up to date. An entry is absent and
+ * invalid if there is no data in the cache and either no layer further
+ * down contains data or the data there is stale.
+ *
+ * This set of states is both necessary and sufficient to model the
+ * three cache operations we support reasoning about: writeback,
+ * writeback-and-invalidate, and just invalidate. The absent and
+ * invalid state in particular is necessary to distinguish writeback-
+ * and-invalidate from invalidate.
+ *
+ * The model here is only sufficient for (and only intended to support)
+ * writing specifications for the synthesis blocks and instructions
+ * that will perform these operations. We do not model the actual cache
+ * state, cache timings, or anything else about the caches. The goal is
+ * only to force the solver to pick instructions that correspond to
+ * specifications.
+ *
+ * Since caches can in general be addressed either by address or by
+ * index number and way number, we provide two functions that map from
+ * addresses and index/way numbers respectively to either the blue or
+ * green cache entries. These functions are distinguished by the
+ * introduction of additional "golem state": this forces the solver to
+ * pick an instruction that uses the same function as found in the
+ * block specification.
+ *
+ * Note that the entry states here are not the cache line states from
+ * the "MESI" (or any similar) cache model.
+ *)
+
+(* this is not possible in either alewife or casp *)
+(*
+type cachelinestate = enum {
+   CACHE_PRESENT_DIRTY,
+   CACHE_PRESENT_CLEAN,
+   CACHE_NOTPRESENT_VALID,
+   CACHE_NOTPRESENT_INVALID
+}*)
+(* instead... *)
+type cachelinestate = 2 bit
+let CACHE_PRESENT_DIRTY: 2 bit = 0b00
+let CACHE_PRESENT_CLEAN: 2 bit = 0b01
+let CACHE_NOTPRESENT_VALID: 2 bit = 0b10
+let CACHE_NOTPRESENT_INVALID: 2 bit = 0b11
+
+type cacheline = 2 bit loc
+
+(*
+ * The cache entries.
+ *)
+
+letstate icache_blue: cacheline
+letstate icache_green: cacheline
+letstate dcache_blue: cacheline
+letstate dcache_green: cacheline
+letstate l2cache_blue: cacheline
+letstate l2cache_green: cacheline
+letstate l3cache_blue: cacheline
+letstate l3cache_green: cacheline
+
+(*
+ * The golem state.
+ *)
+
+letstate icache_vaddr: 1 bit loc
+letstate icache_index: 1 bit loc
+letstate dcache_vaddr: 1 bit loc
+letstate dcache_index: 1 bit loc
+letstate l2cache_vaddr: 1 bit loc
+letstate l2cache_index: 1 bit loc
+letstate l3cache_vaddr: 1 bit loc
+letstate l3cache_index: 1 bit loc
+
+(*
+ * The cache mapping functions.
+ *
+ * XXX: would be nice to have less cutpaste among these.
+ *)
+
+def vaddr_to_icache_entry vaddr:word -> cacheline =
+   if vaddr == 0x00000000 && *icache_vaddr == 0b1 then icache_blue
+   else icache_green
+
+def index_to_icache_entry index:word way:word -> cacheline =
+   if index == 0x00000000 && way == 0x00000000 && *icache_index == 0b1 then icache_blue
+   else icache_green
+
+def vaddr_to_dcache_entry vaddr:word -> cacheline =
+   if vaddr == 0x00000000 && *dcache_vaddr == 0b1 then dcache_blue
+   else dcache_green
+
+def index_to_dcache_entry index:word way:word -> cacheline =
+   if index == 0x00000000 && way == 0x00000000 && *dcache_index == 0b1 then dcache_blue
+   else dcache_green
+
+def vaddr_to_l2cache_entry vaddr:word -> cacheline =
+   if vaddr == 0x00000000 && *l2cache_vaddr == 0b1 then l2cache_blue
+   else l2cache_green
+
+def index_to_l2cache_entry index:word way:word -> cacheline =
+   if index == 0x00000000 && way == 0x00000000 && *l2cache_index == 0b1 then l2cache_blue
+   else l2cache_green
+
+def vaddr_to_l3cache_entry vaddr:word -> cacheline =
+   if vaddr == 0x00000000 && *l3cache_vaddr == 0b1 then l3cache_blue
+   else l3cache_green
+
+def index_to_l3cache_entry index:word way:word -> cacheline =
+   if index == 0x00000000 && way == 0x00000000 && *l3cache_index == 0b1 then l3cache_blue
+   else l3cache_green
+
+(*
+ * The state transfer functions.
+ *)
+
+def cache_wb prestate:cachelinestate -> cachelinestate =
+   if prestate == CACHE_PRESENT_DIRTY then CACHE_PRESENT_CLEAN
+   else prestate
+
+def cache_wbinv prestate:cachelinestate -> cachelinestate =
+   if prestate == CACHE_PRESENT_DIRTY then CACHE_NOTPRESENT_VALID
+   else if prestate == CACHE_PRESENT_CLEAN then CACHE_NOTPRESENT_VALID
+   else prestate
+
+def cache_inv prestate:cachelinestate -> cachelinestate =
+   if prestate == CACHE_PRESENT_DIRTY then CACHE_NOTPRESENT_INVALID
+   else if prestate == CACHE_PRESENT_CLEAN then CACHE_NOTPRESENT_VALID
+   else prestate
+

@@ -1,0 +1,31 @@
+(ADDIU r29 r29 0xffd4 (* -44 *))
+
+(SW r16 r29 0x0000)
+(SW r17 r29 0x0004)
+(SW r18 r29 0x0008)
+(SW r19 r29 0x000c)
+(SW r20 r29 0x0010)
+(SW r21 r29 0x0014)
+(SW r22 r29 0x0018)
+(SW r23 r29 0x001c)
+(SW r28 r29 0x0020)
+(SW r30 r29 0x0024)
+(SW r31 r29 0x0028)
+
+(SW r29 r4 0x0000)
+
+(LW r29 r5 0x0000)
+
+(LW r16 r29 0x0000)
+(LW r17 r29 0x0004)
+(LW r18 r29 0x0008)
+(LW r19 r29 0x000c)
+(LW r20 r29 0x0010)
+(LW r21 r29 0x0014)
+(LW r22 r29 0x0018)
+(LW r23 r29 0x001c)
+(LW r28 r29 0x0020)
+(LW r30 r29 0x0024)
+(LW r31 r29 0x0028)
+
+(ADDIU r29 r29 0x002c (* 44 *))

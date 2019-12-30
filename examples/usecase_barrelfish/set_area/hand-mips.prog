@@ -1,0 +1,4 @@
+(SLTIU r2 r4 0x0001)
+(ADDIU r4 r28 0x0005)
+(ADDIU r5 r28 0x0010)
+(MOVZ r4 r5 r2)

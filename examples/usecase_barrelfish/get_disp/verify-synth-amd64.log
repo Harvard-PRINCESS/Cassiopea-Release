@@ -1,0 +1,5 @@
+Command: Verify prog synth-amd64.prog against spec spec-amd64.spec output to verify-synth-amd64.out; log to verify-synth-amd64.log
+Output to: verify-synth-amd64.out
+Log to: verify-synth-amd64.log
+Verification succeeded!
+	Execution Time: 0.097754s

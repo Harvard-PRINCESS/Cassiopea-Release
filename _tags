@@ -1,0 +1,2 @@
+<**/*>: use_menhir, package(menhirLib), package(batteries)
+<**/*.cma>: use_menhir, byte, ocaml, library, package(menhirLib), package(batteries)

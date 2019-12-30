@@ -1,0 +1,45 @@
+(********** alewife mappings **********)
+
+module initregs {
+	letstate mem_gp: 32 bit 1 len 32 ref memory with lbl_gp
+	def crt0_additional_initialization -> bool = true
+	let crt0_argc_reg: register = R0
+	let crt0_argv_reg: register = R1
+	let crt0_environ_reg: register = R2
+}
+
+module savevals {
+	def readlbl l: 32 label -> word = fetch[l, 32]
+	let crt0_argv_reg: register = R1
+	let crt0_environ_reg: register = R2
+	reg-modify: R3 R4
+}
+
+module longjmp_ret {
+	let reg_arg_retval: register = R1
+	let reg_retval: register = R2
+	reg-modify: N Z C V
+}
+
+module setjmp_ret {
+	let reg_retval: register = R2	
+}
+
+module syscalls_loadnum {
+	let syscall_callnum_reg: register = R0
+	let callnum: word = 0x00000010 (* CALLNUM for syscalls_loadnum *)
+}
+
+module cpu_irqoff {
+  def interrupts_are_on -> bool = if ( *M == super_mode ) then *I == 0b1 else true
+  reg-modify: I
+}
+
+module switch_any {
+	(* shared among all four of the switch blocks *)
+	let switchframesize: 32 bit = 0x00000024 (* 36 *)
+	let stackptr: 32 bit loc = R13
+	let stacksgrowup: bool = false
+	let oldframe_arg_reg: 32 bit loc = R0
+	let newframe_arg_reg: 32 bit loc = R1
+}

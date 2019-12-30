@@ -1,0 +1,16 @@
+require value crt0_argc_reg: wordsize reg
+require value crt0_argv_reg: wordsize reg
+require value crt0_environ_reg : wordsize reg
+require function crt0_additional_initialization: () bool
+
+block initregs {
+	let argc: wordsize vec = *crt0_argc_reg
+	let argv: wordsize vec = *crt0_argv_reg
+	let environ: wordsize vec = *crt0_environ_reg
+	pre: true
+	post:
+   	( *crt0_argc_reg == argc) &&
+   	( *crt0_argv_reg == argv) &&
+   	( *crt0_environ_reg == environ) &&
+	crt0_additional_initialization ()
+}

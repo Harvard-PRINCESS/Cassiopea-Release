@@ -1,0 +1,27 @@
+Command: Interpret prog t30.prog with start state t30.init and output to <stdout>, log to <stdout>
+concrete execution succeeded
+Interp results:
+MEMORY:
+============
+REGION allmem with 32 len, 8 size :
+	0 (0x00000000) : bv:0x00000000
+	4 (0x00000004) : bv:0x00000000
+	8 (0x00000008) : bv:0x00000000
+	12 (0x0000000c) : bv:0x00000000
+	16 (0x00000010) : bv:0x00000000
+	20 (0x00000014) : bv:0x00000000
+	24 (0x00000018) : bv:0x00000000
+	28 (0x0000001c) : bv:0x00000000
+REGISTERS:
+============
+r : bv:0x00000000 : 32 len
+CONTEXT:
+============
+
+NEXT PC:
+============
+int:1
+Read/Write register sets for each instruction: 
+rd: 
+wt: r
+	Execution Time: 0.000153s

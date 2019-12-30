@@ -1,0 +1,24 @@
+require val disp_ptr: ptr
+require val stack_init: lbl
+require val fst: loc (*first param*)
+require val snd: loc (*second param*)
+require val sp: loc (*SP*)
+
+require val init_or_not: bool
+
+accesses fst
+
+modifies snd
+modifies sp
+
+pre:
+	(* disp_ptr in arm: read fron processID register, using mrc (coprocessor) *)
+	*fst = disp_ptr
+
+post:
+	*sp = stack_init
+	if init_or_not then
+		*snd = 0
+	else 
+		*snd = 1
+	(* then we will branch to barrelfish_init_disabled *)

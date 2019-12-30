@@ -1,0 +1,122 @@
+(*NOTE: TEST CODE DONE*)
+(SETREG R0 0x00000048)
+(SETREG R1 0x00000004)
+(SETREG R2 0x00000008)
+(SETREG R3 0x0000000c)
+(SETREG R4 0x00000010)
+(SETREG R5 0x00000014)
+(SETREG R6 0x00000018)
+(SETREG R7 0x0000001c)
+(SETREG R8 0x00000020)
+(SETREG R9 0x00000024)
+(SETREG R10 0x00000028)
+(SETREG R11 0x0000002c)
+(SETREG R12 0x00000030)
+(SETREG R13 0x00000034)
+(SETREG R14 0x00000038)
+(SETREG PC 0x0000003c)
+(SETREG R13_svc 0x00000040)
+(SETREG R14_svc 0x00000044)
+(SETREG CPSR 0x00000000)
+(SETREG SPSR 0x000000FF)
+
+(MSR_CPSR_c 0xd3 0b1110)
+
+(* (LDR_imm_post R14 R0 0x004) *)
+(LDR_imm R14_svc R0 0x000 0b1110)
+(ADD_imm R0 R0 0x0 0x04 0b1110)
+
+(MSR_reg SPSR R14_svc 0b1110)
+(MOV_reg R14_svc R0 0b1110)
+
+(* (LDMIA_wtback R14 13 0x1fff) *)
+(LDR_imm R0 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R1 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R2 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R3 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R4 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R5 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R6 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R7 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R8 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R9 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R10 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R11 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R12 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+
+(ADD_imm R14_svc R14_svc 0x0 0x14 0b1110)
+
+(* (VLDMIA_wtback_64 R14 16 0x0000ffff) (VLDMIA_wtback_64 R14 16 0xffff0000) *)
+
+(SUB_imm R14_svc R14_svc 0x0 0x94 0b1110)
+
+(* (LDMIA_usr R14 2 0x2000) *)
+(LDR_imm R13 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R14 R14_svc 0x000 0b1110)
+(SUB_imm R14_svc R14_svc 0x0 0x04 0b1110)
+
+(LDR_imm R14_svc R14_svc 0x008 0b1110)
+
+(MOVS_reg PC R14_svc 0b1110)
+
+(*
+ASM CODE:
+CPSR_IF_MASK = 0xc0
+ARM_MODE_SVC = 0x13
+    msr    CPSR_c, #(CPSR_IF_MASK | ARM_MODE_SVC)
+    ldr    lr, [r0], #4
+    msr    spsr, lr
+    mov    lr, r0
+    ldmia  lr!, {r0-r12}
+    add lr, #5*4
+    vldmia lr!, {d0-d15}
+    vldmia lr, {d16-d31}
+    sub lr, #(5+32)*4
+    ldmia  lr, {r13, r14}^
+    ldr    lr, [lr, #8]
+    movs pc, lr
+*)
+
+(*
+Memory:
+============
+
+
+Registers:
+============
+CPSR : 40000000, len 32
+PC : 0, len 32
+R0 : 0, len 32
+R1 : 0, len 32
+R10 : 0, len 32
+R11 : 0, len 32
+R12 : 0, len 32
+R13 : 0, len 32
+R13_svc : 40, len 32
+R14 : 0, len 32
+R14_svc : 0, len 32
+R2 : 0, len 32
+R3 : 0, len 32
+R4 : 0, len 32
+R5 : 0, len 32
+R6 : 0, len 32
+R7 : 0, len 32
+R8 : 0, len 32
+R9 : 0, len 32
+SPSR : 0, len 32
+
+*)

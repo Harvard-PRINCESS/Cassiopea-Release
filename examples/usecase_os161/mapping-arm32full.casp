@@ -1,0 +1,118 @@
+(********** alewife mappings **********)
+
+module longjmp_full {
+	let reg_arg_buf: register = R0
+	let reg_arg_retval: register = R1
+	let reg_retval: register = R0
+	let JB_LEN: int = 11
+	(* letstate buf : 32 bit 11 len 32 ref memory *)
+	let pre_r4: 32 bit = fetch [bufptr b+ 0x00000000, 32]
+	let pre_r5: 32 bit = fetch [bufptr b+ 0x00000004, 32]
+	let pre_r6: 32 bit = fetch [bufptr b+ 0x00000008, 32]
+	let pre_r7: 32 bit = fetch [bufptr b+ 0x0000000c, 32]
+	let pre_r8: 32 bit = fetch [bufptr b+ 0x00000010, 32]
+	let pre_r9: 32 bit = fetch [bufptr b+ 0x00000014, 32]
+	let pre_r10: 32 bit = fetch [bufptr b+ 0x00000018, 32]
+	let pre_r11: 32 bit = fetch [bufptr b+ 0x0000001c, 32]
+	let pre_r12: 32 bit = fetch [bufptr b+ 0x00000020, 32]
+	let pre_r13: 32 bit = fetch [bufptr b+ 0x00000024, 32]
+	let pre_r14: 32 bit = fetch [bufptr b+ 0x00000028, 32]
+	def jmp_bufloaded -> bool =
+	   *R4 == pre_r4 &&
+	   *R5 == pre_r5 &&
+	   *R6 == pre_r6 &&
+	   *R7 == pre_r7 &&
+	   *R8 == pre_r8 &&
+	   *R9 == pre_r9 &&
+	   *R10 == pre_r10 &&
+	   *R11 == pre_r11 &&
+	   *R12 == pre_r12 &&
+	   *R13 == pre_r13 &&
+	   *R14 == pre_r14
+
+	reg-modify: N Z C V
+}
+
+module setjmp_full {
+	let reg_arg_buf: register = R0
+	let reg_retval: register = R0
+	let JB_LEN: int = 11
+	(* letstate buf : 32 bit 11 len 32 ref memory *)
+	let pre_r4: 32 bit = *R4
+	let pre_r5: 32 bit = *R5
+	let pre_r6: 32 bit = *R6
+	let pre_r7: 32 bit = *R7
+	let pre_r8: 32 bit = *R8
+	let pre_r9: 32 bit = *R9
+	let pre_r10: 32 bit = *R10
+	let pre_r11: 32 bit = *R11
+	let pre_r12: 32 bit = *R12
+	let pre_r13: 32 bit = *R13
+	let pre_r14: 32 bit = *R14
+	def jmp_bufsaved (bufptr: word) -> bool =
+	   fetch [bufptr b+ 0x00000000, 32] == pre_r4 &&
+	   fetch [bufptr b+ 0x00000004, 32] == pre_r5 &&
+	   fetch [bufptr b+ 0x00000008, 32] == pre_r6 &&
+	   fetch [bufptr b+ 0x0000000c, 32] == pre_r7 &&
+	   fetch [bufptr b+ 0x00000010, 32] == pre_r8 &&
+	   fetch [bufptr b+ 0x00000014, 32] == pre_r9 &&
+	   fetch [bufptr b+ 0x00000018, 32] == pre_r10 &&
+	   fetch [bufptr b+ 0x0000001c, 32] == pre_r11 &&
+	   fetch [bufptr b+ 0x00000020, 32] == pre_r12 &&
+	   fetch [bufptr b+ 0x00000024, 32] == pre_r13 &&
+	   fetch [bufptr b+ 0x00000028, 32] == pre_r14
+
+	reg-modify: N Z C V
+}
+
+module switch_all {
+	(* full context switch *)
+	let switchframesize: 32 bit = 0x00000024 (* 36 *)
+	let switchframecount: int = 9 (* 36/sizeof word *)
+	let stackptr: 32 bit loc = R13
+	let stacksgrowup: bool = false
+	let oldframe_arg_reg: 32 bit loc = R0
+	let newframe_arg_reg: 32 bit loc = R1
+
+	let old_r4: 32 bit = *R4
+	let old_r5: 32 bit = *R5
+	let old_r6: 32 bit = *R6
+	let old_r7: 32 bit = *R7
+	let old_r8: 32 bit = *R8
+	let old_r9: 32 bit = *R9
+	let old_r10: 32 bit = *R10
+	let old_r11: 32 bit = *R11
+	let old_r14: 32 bit = *R14
+        def switchframe_saved -> bool =
+	   fetch [oldframe_base b+ 0x00000000, 32] == old_r4 &&
+	   fetch [oldframe_base b+ 0x00000004, 32] == old_r5 &&
+	   fetch [oldframe_base b+ 0x00000008, 32] == old_r6 &&
+	   fetch [oldframe_base b+ 0x0000000c, 32] == old_r7 &&
+	   fetch [oldframe_base b+ 0x00000010, 32] == old_r8 &&
+	   fetch [oldframe_base b+ 0x00000014, 32] == old_r9 &&
+	   fetch [oldframe_base b+ 0x00000018, 32] == old_r10 &&
+	   fetch [oldframe_base b+ 0x0000001c, 32] == old_r11 &&
+	   fetch [oldframe_base b+ 0x00000020, 32] == old_r14
+
+	let new_r4: word = fetch [newframe_base b+ 0x00000000, 32]
+	let new_r5: word = fetch [newframe_base b+ 0x00000004, 32]
+	let new_r6: word = fetch [newframe_base b+ 0x00000008, 32]
+	let new_r7: word = fetch [newframe_base b+ 0x0000000c, 32]
+	let new_r8: word = fetch [newframe_base b+ 0x00000010, 32]
+	let new_r9: word = fetch [newframe_base b+ 0x00000014, 32]
+	let new_r10: word = fetch [newframe_base b+ 0x00000018, 32]
+	let new_r11: word = fetch [newframe_base b+ 0x0000001c, 32]
+	let new_r14: word = fetch [newframe_base b+ 0x00000020, 32]
+        def switchframe_loaded -> bool =
+	   *R4 == new_r4 &&
+	   *R5 == new_r5 &&
+	   *R6 == new_r6 &&
+	   *R7 == new_r7 &&
+	   *R8 == new_r8 &&
+	   *R9 == new_r9 &&
+	   *R10 == new_r10 &&
+	   *R11 == new_r11 &&
+	   *R14 == new_r14
+
+	reg-modify: N Z C V
+}

@@ -1,0 +1,84 @@
+(********** alewife mappings **********)
+module disp_check_disabled {
+  letstate Mem: 64 bit 1 len 64 ref memory
+  let dispreg: register = RCX
+  let outreg: register = RBX
+
+  def disp_disabled -> word = [Mem, 0]
+  def disabled_flgT -> bool = ( *C == 0b0)
+  def disabled_flgF -> bool = ( *C == 0b0) && ( *Z == 0b1)
+  def disabled_rescheck rreg: register rbv: word -> bool = true
+  reg-modify: C Z
+}
+
+module disp_check_low {
+  letstate Mem: 64 bit 1 len 64 ref memory
+  let dispreg: register = RCX
+  let outreg: register = RBX
+  let pcreg: register = RBX
+  
+  def disp_crit_low -> word = [Mem, 0] (* 96 *)
+  def disabled_flgF -> bool = ( *C == 0b0) && ( *Z == 0b1)
+  def critlow_check critbv: word pcbv: word -> bool = ! (pcbv b< critbv)
+  def critlow_flgT -> bool = ( *C == 0b0)
+  def critlow_flgF -> bool = ( *C == 0b1) && ( *Z == 0b0)
+  def critlow_resT resr: register contw: word -> bool = true
+  def critlow_resF resr: register contw: word -> bool = true
+  reg-modify: C Z
+}
+
+module disp_check_high {
+  letstate Mem: 64 bit 1 len 64 ref memory
+  let dispreg: register = RCX
+  let outreg: register = RBX
+  let pcreg: register = RBX
+  let areareg: register = RCX
+
+  def disp_crit_high -> word = [Mem, 0] (* OFFSETOF_DISP_CRIT_PC_HIGH = 100 *)
+  def critlow_flgT -> bool = ( *C == 0b0)
+  def crithigh_check critbv: word pcbv: word -> bool = (pcbv b< critbv)
+  def crithigh_flgT -> bool = ( *C == 0b1) && ( *Z == 0b0)
+  def crithigh_flgF -> bool = ( *C == 0b0)
+  def crithigh_resT resr: register -> bool = true
+  def crithigh_resF resr: register -> bool = true
+  reg-modify: C Z
+}
+
+module disp_set_area {
+  let areareg: register = RCX
+  let outreg: register = RBX
+  let dispreg: register = RCX
+
+  def enabled_flag -> bool = true
+  def disabled_flag -> bool = true
+  (* OFFSETOF_DISP_ENABLED_AREA *)
+  def enabled_area contw: word -> word = contw b+ 0x0000000000000005
+  (* OFFSETOF_DISP_DISABLED_AREA*)
+  def disabled_area contw: word -> word = contw b+ 0x0000000000000010
+  reg-modify: C Z RDX RAX
+}
+
+module initial_stack {
+  let stackreg: register = RSP
+  let basereg: register = RIP
+  let kernel_stack: word = 0x0000000000000000
+  let kernel_stack_size: word = 0x0000000000000008
+  let STACKLEN: int = 4
+  def check_base base: word -> bool = true
+  def get_stack base: word stack_offset: word -> word = base b+ stack_offset
+}
+
+module get_disp {
+  letstate BASE: 64 bit 4 len 64 ref memory
+  let basereg: register = RIP
+  let dispreg: register = RDI
+  let dcb_current_idx: word = 0x0000000000000000
+  let dcb_disp: word = 0x0000000000000008
+  let DCBLEN: int = 4
+  def check_base base: word dcb_offset: word -> bool = 
+    base == [BASE, 0]
+  def get_dcb base: word dcb_offset: word -> word = 
+    let addr: word = base b+ dcb_offset in
+    fetch [ addr, 64 ]
+  def get_disp addr: word -> word = fetch [ addr, 64 ]
+}

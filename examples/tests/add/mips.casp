@@ -1,0 +1,241 @@
+let wordsize: int = 32
+type word = 32 bit
+type halfword = 16 bit
+type byte = 8 bit
+type gpreg = word loc
+type flag = 1 bit
+type freg = flag loc 
+
+letstate r0: (*const*) gpreg (* z0 *)
+letstate r2: gpreg (* v0 *)
+letstate r3: gpreg (* v1 *)
+letstate r8: gpreg (* t0 *)
+letstate r9: gpreg (* t1 *)
+letstate r10: gpreg (* t2 *)
+
+let r0.txt = "$0"
+let r2.txt = "$2"
+let r3.txt = "$3"
+
+(*****************************************************************************************)
+
+invariant: *r0 == 0x00000000
+
+let wordzero : word = 0x00000000
+let wordone : word = 0x00000001
+
+(* Load 16-bit signed immediate *)
+def read_simm16 (imm: 16 bit) -> 32 bit =
+	let tmp: 32 bit = bv_to_len(32, imm) in
+        if (imm & 0b1000000000000000) != 0b0000000000000000 then
+           tmp | 0b11111111111111110000000000000000
+        else tmp
+
+(* Load 16-bit unsigned immediate *)
+def read_uimm16 (imm: 16 bit) -> 32 bit =
+	bv_to_len(32, imm)
+
+(* Load 5-bit unsigned immediate *)
+def read_uimm5 (imm: 5 bit) -> 32 bit =
+	bv_to_len(32, imm)
+
+(* Signed shift-right *)
+def signedshift (x: 32 bit) (amt: 5 bit) -> 32 bit =
+  let tmp: 32 bit = x >> bv_to_len(32, amt) in
+  if (x & 0b10000000000000000000000000000000) != 0b00000000000000000000000000000000 then
+     let lsamt: 5 bit = (0b11111 b- amt) b+ 0b00001 (* 32 - amt *) in
+     let ones: 32 bit = 0b11111111111111111111111111111111 in
+     tmp | (ones << bv_to_len(32, lsamt))
+  else tmp
+
+(* Produce zero or one *)
+def truthval (x: bool) -> 32 bit =
+	x ? 0b00000000000000000000000000000001
+          : 0b00000000000000000000000000000000
+
+def is_gpreg (x: gpreg) -> bool = true
+  (*switch x: gpreg with
+    case cp0_8_badvaddr -> false
+    case cp0_11_compare -> false
+    case cp0_14_epc -> false
+    case cp0_17_lladdr -> false
+    case _ -> true
+  end*)
+(*
+ * arithmetic
+ *)
+
+defop ADDU rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("addu $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "addu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs b+ *rt]
+}
+
+defop ADDIU rd:gpreg rs:gpreg simm16:16 bit {
+   txt = format("addiu $1, $2, $3", rd.txt, rs.txt, simm16.dec),
+   (* txt = "addiu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs b+ read_simm16(simm16) ]
+}
+
+defop SUBU rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("subu $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs b- *rt ]
+}
+
+defop LUI rd:gpreg uimm16:16 bit {
+   txt = format("lui $1, 0x$2", rd.txt, uimm16.hex),
+   (* txt = "lui " ++ rd.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd));
+            if rd == r0 then skip else *rd <- read_uimm16(uimm16) << 0x00000010 ]
+}
+
+(*
+ * comparisons
+ *)
+
+defop SLT rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("slt $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "slt " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- truthval( *rs bs< *rt) ]
+}
+
+defop SLTI rd:gpreg rs:gpreg simm16:16 bit {
+   txt = format("slti $1, $2, $3", rd.txt, rs.txt, simm16.dec),
+   (* txt = "slti " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- truthval( *rs bs< read_simm16(simm16)) ]
+}
+
+defop SLTU rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("sltu $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "slt " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- truthval( *rs b< *rt) ]
+}
+
+defop SLTIU rd:gpreg rs:gpreg simm16:16 bit {
+   txt = format("sltiu $1, $2, $3", rd.txt, rs.txt, simm16.dec),
+   (* txt = "sltiu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- truthval( *rs b< read_simm16(simm16)) ]
+}
+
+(*
+ * bitwise ops
+ *)
+
+defop AND rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("and $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "and " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs & *rt ]
+}
+
+defop ANDI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = format("andi $1, $2, 0x$3", rd.txt, rs.txt, uimm16.hex),
+   (* txt = "andi " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs & read_uimm16(uimm16) ]
+}
+
+defop NOR rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("nor $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "nor " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs | ~( *rt) ]
+}
+
+defop OR rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("or $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "or " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs | *rt ]
+}
+
+defop ORI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = format("ori $1, $2, 0x$3", rd.txt, rs.txt, uimm16.hex),
+   (* txt = "ori " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs | read_uimm16(uimm16) ]
+}
+
+defop XOR rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("xor $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "or " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs ^ *rt ]
+}
+
+defop XORI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = format("xori $1, $2, 0x$3", rd.txt, rs.txt, uimm16.hex),
+   (* txt = "ori " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs ^ read_uimm16(uimm16) ]
+}
+
+(*
+ * shifts
+ *)
+
+defop SLLV rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("sllv $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "sllv " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs << ( *rt & 0x0000001F) ]
+}
+
+defop SLL rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = format("sll $1, $2, $3", rd.txt, rs.txt, uimm5.dec),
+   (* txt = "sll " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs << read_uimm5(uimm5) ]
+}
+
+defop SRAV rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("srav $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "srav " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip 
+            else let drt: word = *rt in
+              *rd <- signedshift( *rs, (drt[0:5] & 0b11111)) ]
+}
+
+defop SRA rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = format("sra $1, $2, $3", rd.txt, rs.txt, uimm5.dec),
+   (* txt = "sra " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- signedshift( *rs, uimm5) ]
+}
+
+defop SRLV rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("srlv $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "srlv " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs >> ( *rt & 0x0000001F) ]
+}
+
+defop SRL rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = format("srl $1, $2, $3", rd.txt, rs.txt, uimm5.dec),
+   (* txt = "srl " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs >> read_uimm5(uimm5) ]
+}
+(*
+ * move conditional
+ *)
+defop MOVN rd:gpreg rs: gpreg rt: gpreg {
+  txt = format("movn $1, $2, $3", rd.txt, rs.txt, rt.txt),
+  sem = [ assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+          if rd == r0 then skip
+          else if *rt != 0x00000000 then *rd <- *rs else skip ]
+}
+defop MOVZ rd:gpreg rs: gpreg rt: gpreg {
+  txt = format("movz $1, $2, $3", rd.txt, rs.txt, rt.txt),
+  sem = [ assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+          if rd == r0 then skip 
+          else if *rt == 0x00000000 then *rd <- *rs else skip ]
+}

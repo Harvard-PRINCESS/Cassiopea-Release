@@ -1,0 +1,31 @@
+Command: Synthesize for spec t01.spec and output to t01.out, log to t01.log.raw
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Synthesis with 0 insts failed with 1 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Synthesis with 1 insts failed with 1 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Iter 3 Guessing...	Guessing Time: ???s
+Synthesis with 2 insts failed with 2 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Iter 3 Guessing...	Guessing Time: ???s
+Synthesis with 3 insts failed with 2 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Iter 3 Guessing...	Guessing Time: ???s
+Iter 3 Checking...	Checking Time: ???s
+Iter 4 Guessing...	Guessing Time: ???s
+Synthesis with 4 insts failed with 3 counterexamples!
+Synthesis failed!
+	Execution Time: ???s

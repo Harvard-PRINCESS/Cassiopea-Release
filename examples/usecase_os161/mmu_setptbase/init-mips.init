@@ -1,0 +1,4 @@
+(memory got: 32 bit 4 len 32 ref)
+(memory stack: 32 bit 4 len 32 ref)
+([got, 0] = [stack, 0])
+(r4 = [got, 0])

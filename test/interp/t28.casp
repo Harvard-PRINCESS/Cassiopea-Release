@@ -1,0 +1,11 @@
+letstate r: 8 bit loc
+
+defop EQ a: 8 bit  b: 8 bit  {
+	txt = "", (* txt = "eq " ++ a.txt ++ ", " ++ b.txt, *)
+   sem = [
+      if a == b then
+         *r <- 0x01
+      else
+         assert false
+   ]
+}

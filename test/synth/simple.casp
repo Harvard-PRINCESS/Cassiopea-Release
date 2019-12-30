@@ -1,0 +1,7 @@
+(* placeholder *)
+type word = 32 bit
+
+defop nop {
+   txt = "nop",
+   sem = [ skip ]
+}

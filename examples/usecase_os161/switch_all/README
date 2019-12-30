@@ -1,0 +1,9 @@
+This is a complete thread switch.
+
+It is like setjmp_full and longjmp_full together, except more so --
+we cannot possibly synthesize it at present, but we ought to be able
+to verify.
+
+Like setjmp_full and longjmp_full it also lacks prologue/epilogue
+material it might need on some platforms and the final return
+instruction.

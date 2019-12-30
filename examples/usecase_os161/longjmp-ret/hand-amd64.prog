@@ -1,0 +1,4 @@
+(CMP_reg_imm RAX 0x00000000)
+(MOVpure_reg_imm RCX 0x0000000000000001)
+(CMOVZ_reg RBX RCX)
+(CMOVNZ_reg RBX RAX)

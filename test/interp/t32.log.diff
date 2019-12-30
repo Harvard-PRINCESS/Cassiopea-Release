@@ -1,0 +1,10 @@
+--- t32.log.good	2019-12-16 13:59:49.418496036 -0800
++++ t32.log	2019-12-16 14:12:09.869932131 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t32.prog with start state t32.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t32.prog with start state t32.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ Fatal error: exception Failure("concrete execution failed at t32.casp:15,6-15,28 with error: store: got a bitvector address")
+ Fatal error: exception Failure("concrete execution failed at t32.casp:15,6-15,28 with error: store: got a bitvector address")
+ FAILED

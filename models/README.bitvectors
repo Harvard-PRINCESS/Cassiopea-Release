@@ -1,0 +1,36 @@
+for now bitvectors are just nats.
+
+going forward possible choices are:
+ - make an axiomatization (there's a starting point in the grouper tree)
+ - use one of my machine int types from home (but which? there are
+   several and none of them are entirely satisfactory)
+ - use the new standard library stuff
+
+the new standard library stuff:
+
+<pgiarrusso>
+   https://coq.inria.fr/distrib/current/stdlib/Coq.Numbers.Cyclic.Int31.Cyclic31.html
+   The summary is at https://coq.inria.fr/distrib/current/stdlib/ under Numbers
+
+but by default it seems to be a 31-bit int, which is ... not super
+useful, and
+
+   "The type int31 has a unique constructor I31 that expects 31
+   arguments of type digits."
+
+seems like an incipient trainwreck.
+
+<pgiarrusso> dh_work: do reuse the stdlib here
+<pgiarrusso> They have tons of reusable code for this
+
+<pgiarrusso> The part that seems cool is the modular architecture... You get
+  lots of reusable code by implementing a limited amount of operations and
+  properties
+<pgiarrusso> E.g., see the mixins here:
+   https://github.com/coq/coq/blob/master/theories/Numbers/Natural/Abstract/NAxioms.v#L37
+<pgiarrusso> What's also cool is that the reusable lemmas are defined in Module Types
+<pgiarrusso> So, define once, include in both signatures and implementation..
+
+<pgiarrusso> what about (canonical) binary numbers?
+   https://github.com/plfa/plfa.github.io/blob/dev/tspl/Assignment2.lagda#L291
+

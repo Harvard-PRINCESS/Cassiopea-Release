@@ -1,0 +1,6 @@
+(*assume OFFSETOF_DISP_ENABLED_AREA = 0x5*)
+(CMP_reg_imm RBX 0x00000000)
+(MOVpure_reg_off RAX RCX 5)
+(MOVpure_reg_off RDX RCX 16)
+(CMOVZ_reg RCX RAX)
+(CMOVNZ_reg RCX RDX)

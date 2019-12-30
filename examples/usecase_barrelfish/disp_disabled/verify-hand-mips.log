@@ -1,0 +1,5 @@
+Command: Verify prog hand-mips.prog against spec spec-mips.spec output to verify-hand-mips.out; log to verify-hand-mips.log
+Output to: verify-hand-mips.out
+Log to: verify-hand-mips.log
+Verification succeeded!
+	Execution Time: 0.041220s

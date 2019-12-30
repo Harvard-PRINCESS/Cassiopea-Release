@@ -1,0 +1,5 @@
+(memory mem_argv: 32 bit 1 len 32 ref with lbl_argv)
+(memory mem_environ: 32 bit 1 len 32 ref with lbl_environ)
+(R1 = 0xffffffff)
+(R2 = 0xffffffff)
+(R14 = 0xffffffff)

@@ -1,0 +1,4 @@
+(memory allmem: 32 bit 128 len 32 ref)
+(R2 = [allmem, 0])
+(R1 = 0x00000010)
+(R14 = 0x00000001)

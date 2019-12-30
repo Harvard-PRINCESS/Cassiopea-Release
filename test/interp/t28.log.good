@@ -1,0 +1,19 @@
+Command: Interpret prog t28.prog with start state t28.init and output to <stdout>, log to <stdout>
+concrete execution succeeded
+Interp results:
+MEMORY:
+============
+
+REGISTERS:
+============
+r : bv:0x01 : 8 len
+CONTEXT:
+============
+
+NEXT PC:
+============
+int:1
+Read/Write register sets for each instruction: 
+rd: 
+wt: r
+	Execution Time: 0.000103s

@@ -1,0 +1,14 @@
+require value JB_LEN: int
+require value reg_arg_buf: reg
+require value reg_arg_retval: reg
+require value reg_retval: reg
+
+require function jmp_bufloaded: () bool
+
+block longjmp_full {
+	region buf: wordsize bit JB_LEN len wordsize ref
+	let bufptr: vec = *reg_arg_buf
+	let retval: vec = *reg_arg_retval
+	pre: bufptr == [buf, 0]
+	post: jmp_bufloaded() && *reg_retval == (if retval == (0: wordsize vec) then (1: wordsize vec) else retval)
+}

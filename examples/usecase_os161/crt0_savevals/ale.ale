@@ -1,0 +1,16 @@
+require value crt0_argv_reg: reg
+require value crt0_environ_reg: reg
+require function readlbl: (label) word
+
+block savevals {
+	region mem_argv: wordsize bit 1 len wordsize ref with lbl_argv
+	region mem_environ: wordsize bit 1 len wordsize ref with lbl_environ
+	let argv: wordsize vec = *crt0_argv_reg
+	let environ: wordsize vec = *crt0_environ_reg
+	pre: true
+	post:
+		( *crt0_argv_reg == argv) && 
+		( *crt0_environ_reg == environ) && 
+		(readlbl(lbl_argv) == argv) && 
+		(readlbl(lbl_environ) == environ)
+}

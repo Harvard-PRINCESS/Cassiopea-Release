@@ -1,0 +1,16 @@
+--- t08.log.good	2019-12-16 13:59:49.414496083 -0800
++++ t08.log	2019-12-16 14:12:09.565931993 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t08.prog with start state t08.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t08.prog with start state t08.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -181,4 +183,4 @@
+ wt: R3
+ rd: CPSR R3
+ wt: CPSR R1
+-	Execution Time: 0.009808s
++	Execution Time: 0.006999s

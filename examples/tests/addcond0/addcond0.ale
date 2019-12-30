@@ -1,0 +1,18 @@
+require type word
+require type register
+require value dispreg: register
+require value resultreg: register
+require function get_cont : (register) word
+require function addcond0 : () bool
+require function loaded_addcond0 : (word word bool) bool
+block addcond0 {
+	accesses: dispreg
+	modifies: resultreg
+	let b: bool = addcond0()
+	let biv: vec = get_cont(dispreg)
+	let biv2: vec = get_cont(resultreg)
+	pre: true
+	post:
+	(! b || loaded_addcond0(biv, biv2, true)) &&
+	(b || loaded_addcond0(biv, biv2, false))
+}

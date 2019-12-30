@@ -1,0 +1,17 @@
+(*
+   (LI r2 0x00000400(*writable*))
+   (MOVN r5 r2 r5)
+*)
+(SLL r5 r5 0b01010(*10*))
+
+(* XXX r3 should be r7 *)
+(*
+   (LI r2 0x00000100(*global*))
+   (MOVN r3 r2 r3)
+*)
+(SLL r3 r3 0b01000(*8*))
+
+(OR r2 r4 r5)
+(OR r2 r2 r3)
+(ORI r2 r2 0x0200(*valid*))
+

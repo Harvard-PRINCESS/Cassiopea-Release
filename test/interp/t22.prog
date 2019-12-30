@@ -1,0 +1,50 @@
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R3 R13 0x000 0b1110)
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R2 R13 0x000 0b1110)
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R1 R13 0x000 0b1110)
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R0 R13 0x000 0b1110)
+
+(MRS R3 SPSR 0b1110)
+(ANDS_imm R1 R3 0x0 0x0f 0b1110)
+
+(*
+expect result: 
+
+Flag:
+Clear N, Z flag
+
+Memory:
+============
+24 : 0
+28 : 4
+2c : 8
+30 : c
+
+Registers:
+============
+CPSR : 30000000, len 32
+PC : 3c, len 32
+R0 : 0, len 28
+R1 : f, len 32
+R10 : 28, len 32
+R11 : 2c, len 32
+R12 : 30, len 32
+R13 : 24, len 32
+R13_svc : 40, len 32
+R14 : 38, len 32
+R14_svc : 44, len 32
+R2 : 8, len 32
+R3 : f, len 32
+R4 : 10, len 32
+R5 : 14, len 32
+R6 : 18, len 32
+R7 : 1c, len 32
+R8 : 20, len 32
+R9 : 24, len 32
+SPSR : f, len 32
+
+*)
+

@@ -1,0 +1,13 @@
+--- t00.log.good	2019-12-16 13:59:49.422495993 -0800
++++ t00.log	2019-12-30 10:21:56.340695189 -0800
+@@ -1,4 +1,9 @@
+-Command: Synthesize for spec t00.spec and output to t00.out, log to t00.log.raw
++Command: Synthesize for spec t00.spec output to t00.out; log to t00.log.raw
++Output to: t00.out
++Log to: t00.log.raw
++Synthesis with 0 insts starting
++Found dependencies in: 0.000000s
++Found value dependencies in: 0.000005s
+ Iter 1 Guessing...	Guessing Time: ???s
+ Iter 1 Checking...	Checking Time: ???s
+ Synthesis with 0 insts succeeded! Prog:

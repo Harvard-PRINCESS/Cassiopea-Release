@@ -1,0 +1,73 @@
+(*
+ * Because I feel like a masochist tonight, some 16-bit x86.
+ *)
+
+type byte = 8 bit
+type word = 16 bit
+type dword = 32 bit
+type register = word loc
+
+letstate ax: register
+letstate bx: register
+letstate cx: register
+letstate dx: register
+letstate si: register
+letstate di: register
+letstate sp: register
+letstate flags: register
+
+letstate cs: register
+letstate ds: register
+letstate es: register
+letstate ss: register
+
+def gpreg r:register -> bool =
+   r == ax || r == bx || r == cx || r == dx || r == si || r == di || r == sp
+
+def mk_ptr (seg:16 bit) (off:16 bit) -> 20 bit =
+   let segw: 20 bit = bv_to_len(20, seg) in
+   let offw: 20 bit = bv_to_len(20, off) in
+   (segw << 0x00004) b+ offw
+
+defop ADD r1:register r2:register {
+   txt = "add " ++ r1.txt ++ ", " ++ r2.txt,
+   sem = [
+      assert (gpreg(r1));
+      assert (gpreg(r2));
+      *r2 <- *r2 b+ *r1
+   ]
+}
+
+defop MOVrm r1:register r2:register {
+   txt = "mov " ++ r1.txt ++ ", " ++ r2.txt,
+   sem = [
+      assert (gpreg(r1));
+      assert (gpreg(r2));
+      let ptr: 20 bit = mk_ptr( *ds, *r2) in
+      store[ptr, 16] <- *r1
+   ]
+}
+
+defop MOVmr r1:register r2:register {
+   txt = "mov " ++ r1.txt ++ ", " ++ r2.txt,
+   sem = [
+      assert (gpreg(r1));
+      assert (gpreg(r2));
+      let ptr: 20 bit = mk_ptr( *ds, *r1) in
+      *r2 <- fetch[ptr, 16]
+   ]
+}
+
+defop MOVrr r1:register r2:register {
+   txt = "mov " ++ r1.txt ++ ", " ++ r2.txt,
+   sem = [
+      *r2 <- *r1
+   ]
+}
+
+defop MOVir r1:16 bit r2:register {
+   txt = "mov " ++ r1.txt ++ ", " ++ r2.txt,
+   sem = [
+      *r2 <- r1
+   ]
+}

@@ -1,0 +1,22 @@
+require value dispreg: reg
+require value pcreg: reg
+require value outreg: reg
+
+require function disp_crit_high: () word
+require function critlow_flgT: () bool
+require function crithigh_check: (word, word) bool
+require function crithigh_flgT: () bool
+require function crithigh_flgF: () bool
+require function crithigh_resT: (reg) bool
+require function crithigh_resF: (reg) bool
+
+block disp_check_high {
+	let mp: ptr = disp_crit_high ()
+	let outbv: vec = read[mp]
+	let b_crit: bool = crithigh_check(outbv, *pcreg)
+	
+	pre: ( *dispreg == mp ) && critlow_flgT()
+	post:
+		(!b_crit || (crithigh_flgT() && crithigh_resT(outreg)) ) &&
+		(b_crit || (crithigh_flgF() && crithigh_resF(outreg)) )
+}

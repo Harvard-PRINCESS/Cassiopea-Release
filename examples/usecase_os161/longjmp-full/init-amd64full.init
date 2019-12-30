@@ -1,0 +1,4 @@
+(memory buf: 64 bit 8 len 64 ref)
+(RDI = [buf, 0])
+(RSI = 0x0000000000000000)
+(* (RSI = 10) gets the other case *)

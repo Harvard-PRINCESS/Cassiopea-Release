@@ -1,0 +1,10 @@
+some stuff for ../casp/8086.casp:
+
+add2.spec adds two registers
+add2.prog is what it produces for me (looks to be correct)
+add2-wrong.prog also verifies against it (and shouldn't)
+
+mem.spec tries to read from memory, but for me generates an add instruction
+(and, it's (ADD ax bx), which doesn't even involve the registers in the spec)
+
+true.spec generates whatever it wants; I get (ADD sp cx).

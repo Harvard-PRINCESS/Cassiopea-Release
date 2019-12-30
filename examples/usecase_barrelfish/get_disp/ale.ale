@@ -1,0 +1,16 @@
+require value basereg: reg
+require value dispreg: reg
+require value dcb_current_idx: word
+require value dcb_disp: word
+require value DCBLEN: int
+require function check_base: (word, word) bool
+require function get_dcb: (word, word) word
+
+block get_disp {
+	region dcb: wordsize bit DCBLEN len wordsize ref
+	let base: word = *basereg
+	let dispaddr: word = [dcb, 0] + dcb_disp
+	let val: word = read[dispaddr]
+	pre: check_base(base, dcb_current_idx) && get_dcb(base, dcb_current_idx) == [dcb, 0]
+	post: *dispreg == val
+}

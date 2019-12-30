@@ -1,0 +1,20 @@
+Command: Synthesize for spec t04.spec output to t04.out; log to t04.log.raw
+Output to: t04.out
+Log to: t04.log.raw
+Synthesis with 0 insts starting
+Found dependencies in: 0.003451s
+Found value dependencies in: 0.000032s
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Synthesis with 0 insts failed with 1 candidates, 1 counterexamples!
+Synthesis with 1 insts starting
+Found dependencies in: 0.003715s
+Found value dependencies in: 0.000037s
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Synthesis with 1 insts succeeded! Prog:
+(EQ 0b00000000000000000000000000000000 0b00000000000000000000000000000000)
+	Execution Time: ???s

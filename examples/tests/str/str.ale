@@ -1,0 +1,14 @@
+require type word
+require value dispreg : reg
+require value resultreg : reg
+
+block prog_str {
+	region M1: word bit 4 len word ref
+	access: dispreg resultreg
+	let disp: ptr = [M1, 0]
+	let res: vec = *resultreg
+	let cont: vec = read[disp]
+	pre: ( disp == *dispreg )
+	post: ( res == read[disp] ) && ( res == *resultreg )
+}
+

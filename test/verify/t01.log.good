@@ -1,0 +1,3 @@
+Command: Verify prog t01.prog against spec t01.spec and output to t01.out, log to t01.log.raw
+Verification succeeded!
+	Execution Time: ???s

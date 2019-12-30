@@ -1,0 +1,7 @@
+require value reg_retval: reg
+require value wordsize: int
+
+block setjmp_ret {
+	pre: true
+	post: *reg_retval == (0: wordsize vec)
+}

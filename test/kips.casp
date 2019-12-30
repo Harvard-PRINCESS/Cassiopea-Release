@@ -1,0 +1,271 @@
+(*
+ * The "kips", which I just invented, is an 8 bit risc machine with
+ * four 8-bit registers, a single status bit (flag), and some
+ * vestigial supervisor mode appurtenances.
+ *
+ * When the "mir" flag is on (ordinary circumstances) MIRPC mirrors
+ * the PC and the um/ie fields of MIRCTL mirror the um/ie fields of
+ * CTL. When an exception occurs this bit is cleared and the values in
+ * those places at that time are latched in so system software can
+ * read them. Then system software turns the "mir" flag back on.
+ *
+ * It is unlikely that the instructions here can be encoded into 8-bit
+ * instruction words in any particularly reasonable way.
+ *)
+
+type word = 8 bit
+type gpreg = word loc
+
+letstate r0: gpreg
+letstate r1: gpreg
+letstate r2: gpreg
+letstate r3: gpreg
+
+letstate flag: 1 bit loc
+
+letstate mir: 1 bit loc
+
+letstate imask: 4 bit loc
+letstate ctl_um: 1 bit loc
+letstate ctl_ie: 1 bit loc
+letstate mirctl_ipend: 4 bit loc
+letstate mirctl_xcode: 2 bit loc
+letstate mirctl_um: 1 bit loc
+letstate mirctl_ie: 1 bit loc
+letstate mirpc: word loc
+
+let r0.txt = "r0"
+let r1.txt = "r1"
+let r2.txt = "r2"
+let r3.txt = "r3"
+
+(* load constant *)
+defop LC rd:gpreg k:8 bit {
+   txt = format("lc $1, 0x$2", rd.txt, k.hex), 
+   (* txt = "lc " ++ rd.txt ++ ", " ++ k.txt, *)
+   sem = [ *rd <- k ]
+}
+
+(* add *)
+defop ADD rd:gpreg rs:gpreg {
+   txt = format("add $1, $2", rd.txt, rs.txt),
+   (* txt = "add " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *rd <- *rd b+ *rs ]
+}
+
+(* move *)
+defop MOV rd:gpreg rs:gpreg {
+   txt = format("mov $1, $2", rd.txt, rs.txt),
+   (* txt = "mov " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *rd <- *rs ]
+}
+
+(* conditional add *)
+defop CADD rd:gpreg rs:gpreg {
+   txt = format("cadd $1, $2", rd.txt, rs.txt),
+   (* txt = "cadd " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ if *flag == 0b1 then *rd <- *rd b+ *rs else skip ]
+}
+
+(* conditional move *)
+defop CMOV rd:gpreg rs:gpreg {
+   txt = format("cmov $1, $2", rd.txt, rs.txt),
+   (* txt = "cmov " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ if *flag == 0b1 then *rd <- *rs else skip ]
+}
+
+(* negate *)
+defop NEG rd:gpreg {
+   txt = format("neg $1", rd.txt),
+   (* txt = "neg " ++ rd.txt, *)
+   sem = [ *rd <- 0x00 b- *rd ]
+}
+
+(* test less than *)
+defop TLT rd:gpreg rs:gpreg {
+   txt = format("tlt $1, $2", rd.txt, rs.txt),
+   (* txt = "tlt " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *flag <- if *rd b< *rs then 0b1 else 0b0 ]
+}
+
+(* test less than or equal to *)
+(* XXX: casp doesn't have <= (!) so skip this
+defop TLE rd:gpreg rs:gpreg {
+   txt = "tle " ++ rd.txt ++ ", " ++ rs.txt,
+   sem = [ *flag <- if *rd b<= *rs then 0b1 else 0b0 ]
+}
+*)
+
+(* test equal *)
+defop TEQ rd:gpreg rs:gpreg {
+   txt = format("teq $1, $2", rd.txt, rs.txt),
+   (* txt = "teq " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *flag <- if *rd == *rs then 0b1 else 0b0 ]
+}
+
+(* negate the flag *)
+defop NOT {
+   txt = "not",
+   sem = [ *flag <- ~ *flag ]
+}
+
+(* bitwise and *)
+defop ANDB rd:gpreg rs:gpreg {
+   txt = format("andb $1, $2", rd.txt, rs.txt),
+   (* txt = "andb " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *rd <- *rd & *rs ]
+}
+
+(* bitwise or *)
+defop ORB rd:gpreg rs:gpreg {
+   txt = format("orb $1, $2", rd.txt, rs.txt),
+   (* txt = "orb " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *rd <- *rd | *rs ]
+}
+
+(* bitwise xor *)
+defop XORB rd:gpreg rs:gpreg {
+   txt = format("xorb $1, $2", rd.txt, rs.txt),
+   (* txt = "xorb " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *rd <- *rd ^ *rs ]
+}
+
+(* shift left *)
+defop SHL rd:gpreg rs:gpreg {
+   txt = format("shl $1, $2", rd.txt, rs.txt),
+   (* txt = "shl " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *rd <- *rd << *rs ]
+}
+
+(* shift right *)
+defop SHR rd:gpreg rs:gpreg {
+   txt = format("shr $1, $2", rd.txt, rs.txt),
+   (* txt = "shr " ++ rd.txt ++ ", " ++ rs.txt, *)
+   sem = [ *rd <- *rd >> *rs ]
+}
+
+(* bitwise not *)
+defop NOTB rd:gpreg {
+   txt = format("notb $1", rd.txt),
+   (* txt = "notb " ++ rd.txt, *)
+   sem = [ *rd <- ~ *rd ]
+}
+
+(* load from memory *)
+defop LOAD rd:gpreg rs:gpreg {
+   txt = format("load $1, [$2]", rd.txt, rs.txt),
+   (* txt = "load " ++ rd.txt ++ ", [" ++ rs.txt ++ "]", *)
+   sem = [ *rd <- fetch[*rs, 8] ]
+}
+
+(* conditional load from memory *)
+defop CLOAD rd:gpreg rs:gpreg {
+   txt = format("cload $1, [$2]", rd.txt, rs.txt),
+   (* txt = "cload " ++ rd.txt ++ ", [" ++ rs.txt ++ "]", *)
+   sem = [ if *flag == 0b1 then *rd <- fetch[*rs, 8] else skip ]
+}
+
+(* store to memory *)
+defop STORE rd:gpreg rs:gpreg {
+   txt = format("store [$1], $2", rd.txt, rs.txt),
+   (* txt = "store [" ++ rd.txt ++ "], " ++ rs.txt, *)
+   sem = [ store[*rd, 8] <- *rs ]
+}
+
+(* get IMASK *)
+defop GIM rd:gpreg {
+   txt = format("gim $1", rd.txt),
+   (* txt = "gim " ++ rd.txt, *)
+   sem = [ *rd <- bv_to_len(8, *imask) ]
+}
+
+(* put IMASK *)
+defop PIM rd:gpreg {
+   txt = format("pim $1", rd.txt),
+   (* txt = "pim " ++ rd.txt, *)
+   sem = [ *imask <- bv_to_len(4, *rd & 0x0f) ]
+}
+
+(* get CTL *)
+defop GC rd:gpreg {
+   txt = format("gc $1", rd.txt),
+   (* txt = "gc " ++ rd.txt, *)
+   sem = [
+      *rd <-
+	 (bv_to_len(8, *ctl_um) << 0x01) |
+	 (bv_to_len(8, *ctl_ie))
+   ]
+}
+
+(* put CTL *)
+defop PC rd:gpreg {
+   txt = format("pc $1", rd.txt),
+   (* txt = "pc " ++ rd.txt, *)
+   sem = [
+      *ctl_um <- bv_to_len(1, ( *rd & 0x02) >> 0x01);
+      *ctl_ie <- bv_to_len(1, *rd & 0x01)
+   ]
+}
+
+(* get MIRCTL (you can't put it) *)
+defop GMC rd:gpreg {
+   txt = format("gmc $1", rd.txt),
+   (* txt = "gmc " ++ rd.txt, *)
+   sem = [
+      *rd <-
+         (bv_to_len(8, *mirctl_ipend) << 0x04) |
+	 (bv_to_len(8, *mirctl_xcode) << 0x02) |
+         (bv_to_len(8, *ctl_um) << 0x01) |
+	 (bv_to_len(8, *ctl_ie))
+   ]
+}
+
+(* get MIRPC (you can't put it) *)
+defop GMPC rd:gpreg {
+   txt = format("gmpc $1", rd.txt),
+   (* txt = "gmpc " ++ rd.txt, *)
+   sem = [ *rd <- *mirpc ]
+}
+
+(* set MIR *)
+defop PMN {
+   txt = "pm no",
+   sem = [ *mir <- 0b0 ]
+}
+defop PMY {
+   txt = "pm yes",
+   sem = [ *mir <- 0b1 ]
+}
+
+(* things that should be here but you can't do in casp *)
+(*
+
+(* jump *)
+defop J	rs:gpreg {
+   txt = "j " ++ rs.txt,
+   sem = [ *PC <- rs ]
+}
+
+(* conditional jump == branch *)
+defop CJ rs:gpreg {
+   txt = "cj " ++ rs.txt,
+   sem = [ if *flag == 0b1 then *PC <- rs else skip ]
+}
+
+(* jump with return (call) *)
+defop JR rd:gpreg rs:gpreg {
+   txt = "jr " ++ rd.txt ++ ", " ++ rs.txt,
+   sem = [ *rd <- *PC; *PC <- rs ]
+}
+
+(* jump from exception (exception return) *)
+defop JX rd:gpreg rs:gpreg {
+   txt = "jx " ++ rd.txt ++ ", " ++ rs.txt,
+   sem = [
+      *PC <- *rs; 
+      *ctl_um <- bv_to_len(1, ( *rd & 0x02) >> 0x01);
+      *ctl_ie <- bv_to_len(1, *rd & 0x01)
+   ]
+}
+
+*)

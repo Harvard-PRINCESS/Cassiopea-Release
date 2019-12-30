@@ -1,0 +1,171 @@
+CASP=../../cassiopeia
+ALE=../../alewife
+
+1_INST_DIR=./1inst
+2_INST_DIR=./2inst
+3_INST_DIR=./3inst
+4_INST_DIR=./4inst
+INSANITY=./insanity
+PTR_DIR=./ptr
+CASP_DIR=./casp
+SPEC_DIR=./spec
+
+mkdir:
+	rm -rf $(SPEC_DIR) && \
+	mkdir -p $(SPEC_DIR)
+
+clean:
+	rm -rf $(SPEC_DIR)
+	
+ale:
+	$(ALE) $(1_INST_DIR)/add1.ale -o $(SPEC_DIR)/add1.spec
+	$(ALE) $(2_INST_DIR)/add2.ale -o $(SPEC_DIR)/add2.spec
+	$(ALE) $(3_INST_DIR)/add3.ale -o $(SPEC_DIR)/add3.spec
+	$(ALE) $(4_INST_DIR)/add4.ale -o $(SPEC_DIR)/add4.spec
+	$(ALE) $(1_INST_DIR)/addcond1.ale -o $(SPEC_DIR)/addcond1.spec
+	$(ALE) $(2_INST_DIR)/addcond2.ale -o $(SPEC_DIR)/addcond2.spec
+	$(ALE) $(3_INST_DIR)/addcond3.ale -o $(SPEC_DIR)/addcond3.spec
+	$(ALE) $(4_INST_DIR)/addcond4.ale -o $(SPEC_DIR)/addcond4.spec
+	$(ALE) $(3_INST_DIR)/cmpaddcond3.ale -o $(SPEC_DIR)/cmpaddcond3.spec
+	$(ALE) $(4_INST_DIR)/cmpaddcond4.ale -o $(SPEC_DIR)/cmpaddcond4.spec
+	$(ALE) $(PTR_DIR)/ptr.ale -o $(SPEC_DIR)/ptr.spec
+	$(ALE) $(PTR_DIR)/reg.ale -o $(SPEC_DIR)/reg.spec
+	$(ALE) $(2_INST_DIR)/sum3.ale -o $(SPEC_DIR)/sum3.spec
+	$(ALE) $(INSANITY)/ptr5.ale -o $(SPEC_DIR)/ptr5.spec
+
+verify:
+	echo "SUCCEEDED CASE:"
+	# non-mem-access program + mem-access inst in casp
+	# # non-cond-exec program
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/add1.spec $(1_INST_DIR)/add1.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/add2.spec $(2_INST_DIR)/add2.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/add3.spec $(3_INST_DIR)/add3-arm.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/add3.spec $(4_INST_DIR)/add4.prog
+	# # cond-exec program
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/addcond1.spec $(1_INST_DIR)/addcond1.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/addcond2.spec $(2_INST_DIR)/addcond2.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/addcond3.spec $(3_INST_DIR)/addcond3.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/addcond3.spec $(4_INST_DIR)/addcond4.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/cmpaddcond3.spec $(3_INST_DIR)/cmpaddcond3.prog
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/cmpaddcond4.spec $(4_INST_DIR)/cmpaddcond4.prog
+
+	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/ptr.spec $(PTR_DIR)/prog.prog
+
+# non-mem-access program + non-mem-access inst in casp
+# # non-cond-exec program
+# 	$(CASP) $(CASP_DIR)/arm-reg.casp -verify $(SPEC_DIR)/add1.spec $(1_INST_DIR)/add1.prog
+# 	$(CASP) $(CASP_DIR)/arm-reg.casp -verify $(SPEC_DIR)/add2.spec $(2_INST_DIR)/add2.prog
+# 	$(CASP) $(CASP_DIR)/arm-reg.casp -verify $(SPEC_DIR)/add3.spec $(3_INST_DIR)/add3-arm.prog
+# 	$(CASP) $(CASP_DIR)/arm-small.casp -verify $(SPEC_DIR)/add1.spec $(1_INST_DIR)/add1.prog
+# 	$(CASP) $(CASP_DIR)/arm-small.casp -verify $(SPEC_DIR)/add2.spec $(2_INST_DIR)/add2.prog
+# 	$(CASP) $(CASP_DIR)/arm-small.casp -verify $(SPEC_DIR)/add3.spec $(3_INST_DIR)/add3-arm.prog
+
+# 	echo "FAILED CASE:"
+# 	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/ptr.spec $(2_INST_DIR)/addcond2.prog
+# 	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/addcond1.spec $(2_INST_DIR)/addcond2.prog
+# 	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/addcond2.spec $(3_INST_DIR)/addcond3.prog
+# 	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/addcond3.spec $(3_INST_DIR)/cmpaddcond3.prog
+# 	$(CASP) $(CASP_DIR)/arm-flag.casp -verify $(SPEC_DIR)/cmpaddcond3.spec $(1_INST_DIR)/addcond1.prog
+# 	$(CASP) $(CASP_DIR)/arm-small.casp -verify $(SPEC_DIR)/add1.spec $(1_INST_DIR)/add1-fail.prog
+# 	$(CASP) $(CASP_DIR)/arm-small.casp -verify $(SPEC_DIR)/add2.spec $(2_INST_DIR)/add2-fail.prog
+
+# non-mem-access inst in casp
+# synth-noncond-tiny: synth-1inst-noncond-tiny synth-2inst-noncond-tiny synth-3inst-noncond-tiny
+# synth-noncond-small: synth-1inst-noncond-small synth-2inst-noncond-small synth-3inst-noncond-small synth-4inst-noncond-small
+# synth-cond-small: synth-1inst-cond-small synth-2inst-cond-small synth-3inst-cond-small synth-4inst-cond-small
+
+# synth-1inst-noncond-tiny:
+# 	time $(CASP) $(CASP_DIR)/arm-small.casp -synth $(SPEC_DIR)/add1.spec 1
+# synth-2inst-noncond-tiny:
+# 	time $(CASP) $(CASP_DIR)/arm-small.casp -synth $(SPEC_DIR)/add2.spec 2
+# synth-3inst-noncond-tiny:
+# 	time $(CASP) $(CASP_DIR)/arm-small.casp -synth $(SPEC_DIR)/add3.spec 3
+
+# synth-1inst-noncond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/add1.spec 1
+# synth-2inst-noncond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/add2.spec 2
+# synth-3inst-noncond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/add3.spec 3
+# synth-4inst-noncond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/add4.spec 4
+
+# synth-1inst-cond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/addcond1.spec 1
+# synth-2inst-cond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/addcond2.spec 2
+# synth-3inst-cond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/cmpaddcond3.spec 3
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/addcond3.spec 3
+# synth-4inst-cond-small:
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/cmpaddcond4.spec 4
+# 	time $(CASP) $(CASP_DIR)/arm-reg.casp -synth $(SPEC_DIR)/addcond4.spec 4
+
+# mem-access inst in casp
+synth-1inst: synth-1inst-noncond synth-1inst-cond
+synth-2inst: synth-2inst-noncond synth-2inst-cond
+synth-3inst: synth-3inst-noncond synth-3inst-cond
+synth-4inst: synth-4inst-noncond synth-4inst-cond
+
+synth-ptr:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/ptr.spec 1
+	time $(CASP) $(CASP_DIR)/mips.casp -synth $(SPEC_DIR)/ptr.spec 1
+synth-reg:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/reg.spec 1
+	time $(CASP) $(CASP_DIR)/mips.casp -synth $(SPEC_DIR)/reg.spec 1
+
+synth-1inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/add1.spec 1
+synth-2inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/add2.spec 2
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/sum3.spec 2
+synth-3inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/add3.spec 3
+synth-4inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/add4.spec 4
+
+synth-1inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/addcond1.spec 1
+synth-2inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/addcond2.spec 2
+synth-3inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/cmpaddcond3.spec 3
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/addcond3.spec 3
+synth-4inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/addcond4.spec 4
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -synth $(SPEC_DIR)/cmpaddcond4.spec 4
+
+deduce-1inst: deduce-1inst-noncond deduce-1inst-cond
+deduce-2inst: deduce-2inst-noncond deduce-2inst-cond
+deduce-3inst: deduce-3inst-noncond deduce-3inst-cond
+deduce-4inst: deduce-4inst-noncond deduce-4inst-cond
+
+deduce-ptr:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/ptr.spec
+	time $(CASP) $(CASP_DIR)/mips.casp -deduce $(SPEC_DIR)/ptr.spec
+deduce-reg:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/reg.spec
+	time $(CASP) $(CASP_DIR)/mips.casp -deduce $(SPEC_DIR)/reg.spec
+deduce-insanity:
+	time $(CASP) $(CASP_DIR)/arm-flag-5reg.casp -deduce $(SPEC_DIR)/ptr5.spec
+	time $(CASP) $(CASP_DIR)/mips-5reg.casp -deduce $(SPEC_DIR)/ptr5.spec
+
+deduce-1inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/add1.spec
+deduce-2inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/add2.spec
+deduce-3inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/add3.spec
+deduce-4inst-noncond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/add4.spec
+
+deduce-1inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/addcond1.spec
+deduce-2inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/addcond2.spec
+deduce-3inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/cmpaddcond3.spec
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/addcond3.spec
+deduce-4inst-cond:
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/addcond4.spec
+	time $(CASP) $(CASP_DIR)/arm-flag.casp -deduce $(SPEC_DIR)/cmpaddcond4.spec

@@ -1,0 +1,1812 @@
+(*
+ * sparc64
+ *
+ * note: we don't try to know about register windows
+ * also, none of the control registers are really modeled yet
+ *)
+
+let wordsize: int = 64
+type word = 64 bit
+type u64 = 64 bit
+type u32 = 32 bit
+type u16 = 16 bit
+type u8 = 8 bit
+
+type simm13 = 13 bit
+type simm11 = 11 bit
+type simm10 = 10 bit
+type uimm6 = 6 bit
+type uimm5 = 5 bit
+
+type gpreg = word loc
+
+letstate g0: gpreg (* constant 0 *)
+letstate g1: gpreg
+(*
+letstate g2: gpreg
+letstate g3: gpreg
+letstate g4: gpreg
+letstate g5: gpreg
+letstate g6: gpreg
+letstate g7: gpreg
+
+letstate o0: gpreg
+letstate o1: gpreg
+letstate o2: gpreg
+letstate o3: gpreg
+letstate o4: gpreg
+letstate o5: gpreg
+letstate o6: gpreg	(* also %fp *)
+letstate o7: gpreg	(* return address *)
+
+letstate l0: gpreg
+letstate l1: gpreg
+letstate l2: gpreg
+letstate l3: gpreg
+letstate l4: gpreg
+letstate l5: gpreg
+letstate l6: gpreg
+letstate l7: gpreg
+*)
+letstate i0: gpreg
+letstate i1: gpreg
+letstate i2: gpreg
+letstate i3: gpreg
+(*
+letstate i4: gpreg
+letstate i5: gpreg
+letstate i6: gpreg	(* also %sp *)
+letstate i7: gpreg
+*)
+
+let g0.txt = "%g0"
+let g1.txt = "%g1"
+(*
+let g2.txt = "%g2"
+let g3.txt = "%g3"
+let g4.txt = "%g4"
+let g5.txt = "%g5"
+let g6.txt = "%g6"
+let g7.txt = "%g7"
+let o0.txt = "%o0"
+let o1.txt = "%o1"
+let o2.txt = "%o2"
+let o3.txt = "%o3"
+let o4.txt = "%o4"
+let o5.txt = "%o5"
+let o6.txt = "%o6"
+let o7.txt = "%o7"
+let l0.txt = "%l0"
+let l1.txt = "%l1"
+let l2.txt = "%l2"
+let l3.txt = "%l3"
+let l4.txt = "%l4"
+let l5.txt = "%l5"
+let l6.txt = "%l6"
+let l7.txt = "%l7"
+*)
+let i0.txt = "%i0"
+let i1.txt = "%i1"
+let i2.txt = "%i2"
+let i3.txt = "%i3"
+(*
+let i4.txt = "%i4"
+let i5.txt = "%i5"
+let i6.txt = "%i6"
+let i7.txt = "%i7"
+*)
+
+def is_gpreg r:gpreg -> bool =
+   r == g0 || r == g1 || (*r == g2 || r == g3 ||
+   r == g4 || r == g5 || r == g6 || r == g7 ||
+   r == o0 || r == o1 || r == o2 || r == o3 ||
+   r == o4 || r == o5 || r == o6 || r == o7 ||
+   r == l0 || r == l1 || r == l2 || r == l3 ||
+   r == l4 || r == l5 || r == l6 || r == l7 ||*)
+   r == i0 || r == i1 || r == i2 || r == i3 (*||
+   r == i4 || r == i5 || r == i6 || r == i7*)
+
+invariant: *g0 == 0x0000000000000000
+
+
+(* %xcc bits *)
+letstate xnf: 1 bit loc (* 64-bit negative *)
+letstate xzf: 1 bit loc (* 64-bit zero *)
+letstate xvf: 1 bit loc (* 64-bit overflow *)
+letstate xcf: 1 bit loc (* 64-bit carry *)
+(* %icc bits *)
+letstate inf: 1 bit loc (* 32-bit negative *)
+letstate izf: 1 bit loc (* 32-bit zero *)
+letstate ivf: 1 bit loc (* 32-bit overflow *)
+letstate icf: 1 bit loc (* 32-bit carry *)
+
+def readccr -> word =
+   let vxn: word = bv_to_len(64, *xnf) << 0x0000000000000007 in
+   let vxz: word = bv_to_len(64, *xzf) << 0x0000000000000006 in
+   let vxv: word = bv_to_len(64, *xvf) << 0x0000000000000005 in
+   let vxc: word = bv_to_len(64, *xcf) << 0x0000000000000004 in
+   let vin: word = bv_to_len(64, *inf) << 0x0000000000000003 in
+   let viz: word = bv_to_len(64, *izf) << 0x0000000000000002 in
+   let viv: word = bv_to_len(64, *ivf) << 0x0000000000000001 in
+   let vic: word = bv_to_len(64, *icf) in
+   vxn | vxz | vxv | vxc | vin | viz | viv | vic
+
+proc writeccr v:word =
+   *xnf <- if v[7] then 0b1 else 0b0;
+   *xzf <- if v[6] then 0b1 else 0b0;
+   *xvf <- if v[5] then 0b1 else 0b0;
+   *xcf <- if v[4] then 0b1 else 0b0;
+   *inf <- if v[3] then 0b1 else 0b0;
+   *izf <- if v[2] then 0b1 else 0b0;
+   *ivf <- if v[1] then 0b1 else 0b0;
+   *icf <- if v[0] then 0b1 else 0b0
+
+(* unprivileged special registers *)
+(*letstate asi: 64 bit loc*)
+
+(* privileged special registers *)
+(*letstate tpc: 64 bit loc*)
+(*letstate tnpc: 64 bit loc*)
+(*letstate tstate: 64 bit loc*)
+(*letstate tt: 64 bit loc*)
+(*letstate tick: 64 bit loc*)
+(*letstate tba: 64 bit loc*)
+(*letstate pstate: 64 bit loc*)
+(*letstate tl: 64 bit loc*)
+(*letstate pil: 64 bit loc*)
+(*letstate cwp: 64 bit loc*)
+(*letstate cansave: 64 bit loc*)
+(*letstate canrestore: 64 bit loc*)
+(*letstate cleanwin: 64 bit loc*)
+(*letstate otherwin: 64 bit loc*)
+(*letstate wstate: 64 bit loc*)
+(*letstate fq: 64 bit loc*)
+(*letstate ver: 64 bit loc*)
+
+
+def signextend32 x:u32 -> word =
+   let wx: word = bv_to_len(64, x) in
+   if x[31] then wx | 0xffffffff00000000 else wx
+
+def signextend13 x:simm13 -> word =
+   let wx: word = bv_to_len(64, x) in
+   if x[12] then wx | 0xffffffffffffe000 else wx
+
+def signextend11 x:simm11 -> word =
+   let wx: word = bv_to_len(64, x) in
+   if x[10] then wx | 0xfffffffffffff800 else wx
+
+def signextend10 x:simm10 -> word =
+   let wx: word = bv_to_len(64, x) in
+   if x[9] then wx | 0xfffffffffffffc00 else wx
+
+(* A.2 add *)
+proc setflags_add result:word a:word b:word =
+   *xnf <- if result[63] then 0b1 else 0b0;
+   *xzf <- if result == 0x0000000000000000 then 0b1 else 0b0;
+   *xvf <- if a[63] == b[63] && result[63] != a[63] then 0b1 else 0b0;
+   *xcf <- if (if *xvf == 0b1 then !result[63] else result[63]) then 0b1
+           else 0b0;
+   *inf <- if result[31] then 0b1 else 0b0;
+   *izf <- if (result & 0x00000000ffffffff) == 0x0000000000000000 then 0b1
+           else 0b0;
+   *ivf <- if result[32] != result[31] then 0b1 else 0b0;
+   *icf <- if result[32] then 0b1 else 0b0
+defop add_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("add $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 b+ *rs2
+   ]
+}
+defop add_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("add $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 b+ signextend13(imm)
+   ]
+}
+defop addcc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("addcc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 b+ *rs2 in
+      setflags_add(result, *rs1, *rs2);
+      *rd <- result
+   ]
+}
+defop addcc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("addcc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let v2: word = signextend13(imm) in
+      let result: word = *rs1 b+ v2 in
+      setflags_add(result, *rs1, v2);
+      *rd <- result
+   ]
+}
+
+(* A.3 bpr *)
+defop brz rs1:gpreg tgt:8 bit {
+   txt = format("brz $1, $2", rs1.txt, tgt.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      if *rs1 == 0x0000000000000000 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop brlez rs1:gpreg tgt:8 bit {
+   txt = format("brlez $1, $2", rs1.txt, tgt.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      if *rs1 == 0x0000000000000000 || *rs1 b< 0x0000000000000000 then
+         BRANCH(bv_to_uint(tgt))
+      else skip
+   ]
+}
+defop brlz rs1:gpreg tgt:8 bit {
+   txt = format("brlz $1, $2", rs1.txt, tgt.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      if *rs1 bs< 0x0000000000000000 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop brnz rs1:gpreg tgt:8 bit {
+   txt = format("brnz $1, $2", rs1.txt, tgt.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      if *rs1 != 0x0000000000000000 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop brgz rs1:gpreg tgt:8 bit {
+   txt = format("brgz $1, $2", rs1.txt, tgt.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      if *rs1 bs> 0x0000000000000000 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop brgez rs1:gpreg tgt:8 bit {
+   txt = format("brgez $1, $2", rs1.txt, tgt.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      if *rs1 == 0x0000000000000000 || *rs1 bs> 0x0000000000000000 then
+         BRANCH(bv_to_uint(tgt))
+      else skip
+   ]
+}
+
+(* A.7 bpcc *)
+defop ba use64:bool tgt:8 bit {
+   txt = format("ba $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      BRANCH(bv_to_uint(tgt))
+   ]
+}
+(*defop bn use64:bool tgt:8 bit {
+   txt = format("bn $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      skip
+   ]
+}*)
+defop bne use64:bool tgt:8 bit {
+   txt = format("bne $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let z: 1 bit = if use64 then *xzf else *izf in
+      if z == 0b0 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop be use64:bool tgt:8 bit {
+   txt = format("be $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let z: 1 bit = if use64 then *xzf else *izf in
+      if z == 0b1 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bg use64:bool tgt:8 bit {
+   txt = format("bg $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if z == 0b0 && n == v then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop ble use64:bool tgt:8 bit {
+   txt = format("ble $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if z == 0b1 || n != v then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bge use64:bool tgt:8 bit {
+   txt = format("bge $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if n == v then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bl use64:bool tgt:8 bit {
+   txt = format("bl $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if n != v then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bgu use64:bool tgt:8 bit {
+   txt = format("bgu $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b0 && z == 0b0 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bleu use64:bool tgt:8 bit {
+   txt = format("bleu $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b1 || z == 0b1 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bcc use64:bool tgt:8 bit {
+   txt = format("bcc $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b0 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bcs use64:bool tgt:8 bit {
+   txt = format("bcs $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b1 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bpos use64:bool tgt:8 bit {
+   txt = format("bpos $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let n: 1 bit = if use64 then *xnf else *inf in
+      if n == 0b0 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bneg use64:bool tgt:8 bit {
+   txt = format("bneg $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let n: 1 bit = if use64 then *xnf else *inf in
+      if n == 0b1 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bvc use64:bool tgt:8 bit {
+   txt = format("bvc $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if v == 0b0 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+defop bvs use64:bool tgt:8 bit {
+   txt = format("bvs $1, $2", if use64 then "%xcc" else "%icc", tgt.hex),
+   sem = [
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if v == 0b1 then BRANCH(bv_to_uint(tgt)) else skip
+   ]
+}
+
+(* A.27 load integer *)
+(*defop ldub_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("ldub [$1 + $2], $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- bv_to_len(64, fetch[addr, 8])
+   ]
+}*)
+(*defop ldub_i rs1:gpreg off:simm13 rd:gpreg {
+   txt = format("ldub [$1 + $2], $3", rs1.txt, off.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let addr: word = *rs1 b+ signextend13(off) in
+      *rd <- bv_to_len(64, fetch[addr, 8])
+   ]
+}*)
+(*defop ldsw_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("ldsw [$1 + $2], $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- signextend32(fetch[addr, 32])
+   ]
+}*)
+(*defop ldsw_i rs1:gpreg off:simm13 rd:gpreg {
+   txt = format("ldsw [$1 + $2], $3", rs1.txt, off.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let addr: word = *rs1 b+ signextend13(off) in
+      *rd <- signextend32(fetch[addr, 32])
+   ]
+}*)
+defop lduw_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("lduw [$1 + $2], $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- bv_to_len(64, fetch[addr, 32])
+   ]
+}
+defop lduw_i rs1:gpreg off:simm13 rd:gpreg {
+   txt = format("lduw [$1 + $2], $3", rs1.txt, off.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let addr: word = *rs1 b+ signextend13(off) in
+      *rd <- bv_to_len(64, fetch[addr, 32])
+   ]
+}
+defop ldx_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("ldx [$1 + $2], $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- fetch[addr, 64]
+   ]
+}
+defop ldx_i rs1:gpreg off:simm13 rd:gpreg {
+   txt = format("ldx [$1 + $2], $3", rs1.txt, off.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let addr: word = *rs1 b+ signextend13(off) in
+      *rd <- fetch[addr, 64]
+   ]
+}
+
+(* A.28 load integer from alternate space *)
+(* note: there's also a "[reg + simm13] %asi" form, skipping it *)
+(* XXX can't do these yet, don't have userspace pointers *)
+(*defop ldub_user rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("lduba [$1 + $2] #ASI_AS_IF_USER_PRIMARY, $3",
+                rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- bv_to_len(64, fetch[addr, 8])
+   ]
+}*)
+(*defop ldsw_user rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("ldswa [$1 + $2] #ASI_AS_IF_USER_PRIMARY, $3",
+                rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- signextend32(fetch[addr, 32])
+   ]
+}*)
+(*defop lduw_user rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("lduwa [$1 + $2] #ASI_AS_IF_USER_PRIMARY, $3",
+                rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- bv_to_len(64, fetch[addr, 32])
+   ]
+}*)
+(*defop ldx_user rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("ldxa [$1 + $2] #ASI_AS_IF_USER_PRIMARY, $3",
+                rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      *rd <- fetch[addr, 64]
+   ]
+}*)
+
+(* A.31 logical operations *)
+proc setflags_bitop(result: word) =
+   *xnf <- if result[63] then 0b1 else 0b0;
+   *xzf <- if result == 0x0000000000000000 then 0b1 else 0b0;
+   *xvf <- 0b0;
+   *xcf <- 0b0;
+   *inf <- if result[31] then 0b1 else 0b0;
+   *izf <- if result[0:32] == 0x00000000 then 0b1 else 0b0;
+   *ivf <- 0b0;
+   *icf <- 0b0
+defop and_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("and $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 & *rs2
+   ]
+}
+defop and_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("and $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 & signextend13(imm)
+   ]
+}
+defop andcc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("andcc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 & *rs2 in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop andcc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("andcc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let result: word = *rs1 & signextend13(imm) in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop andn_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("andn $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 & ~*rs2
+   ]
+}
+defop andn_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("andn $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 & ~signextend13(imm)
+   ]
+}
+defop andncc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("andncc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 & ~*rs2 in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop andncc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("andncc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let result: word = *rs1 & ~signextend13(imm) in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop or_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("or $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 | *rs2
+   ]
+}
+defop or_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("or $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 | signextend13(imm)
+   ]
+}
+defop orcc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("orcc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 | *rs2 in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop orcc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("orcc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let result: word = *rs1 | signextend13(imm) in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop orn_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("orn $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 | ~*rs2
+   ]
+}
+defop orn_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("orn $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 | ~signextend13(imm)
+   ]
+}
+defop orncc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("orncc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 | ~*rs2 in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop orncc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("orncc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let result: word = *rs1 | ~signextend13(imm) in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop xnor_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("xnor $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 ^ ~*rs2
+   ]
+}
+defop xnor_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("xnor $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 ^ ~signextend13(imm)
+   ]
+}
+defop xnorcc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("xnorcc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 ^ ~*rs2 in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop xnorcc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("xnorcc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let result: word = *rs1 ^ ~signextend13(imm) in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop xor_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("xor $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 ^ *rs2
+   ]
+}
+defop xor_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("xor $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 ^ signextend13(imm)
+   ]
+}
+defop xorcc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("xorcc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 ^ *rs2 in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+defop xorcc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("xorcc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let result: word = *rs1 ^ signextend13(imm) in
+      setflags_bitop(result);
+      *rd <- result
+   ]
+}
+
+(* A.35 move integer register on condition *)
+(*defop mova_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("mova $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs2
+   ]
+}*)
+(*defop mova_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("mova $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- signextend11(imm)
+   ]
+}*)
+(*defop movn_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movn $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      skip
+   ]
+}*)
+(*defop movn_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movn $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      skip
+   ]
+}*)
+defop movne_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movne $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      if z == 0b0 then *rd <- *rs2 else skip
+   ]
+}
+defop movne_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movne $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      if z == 0b0 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop move_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("move $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      if z == 0b1 then *rd <- *rs2 else skip
+   ]
+}
+defop move_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("move $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      if z == 0b1 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movg_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movg $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if z == 0b0 && n == v then *rd <- *rs2 else skip
+   ]
+}
+defop movg_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movg $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if z == 0b0 && n == v then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movle_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movle $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if z == 0b1 || n != v then *rd <- *rs2 else skip
+   ]
+}
+defop movle_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movle $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if z == 0b1 || n != v then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movge_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movge $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if n == v then *rd <- *rs2 else skip
+   ]
+}
+defop movge_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movge $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if n == v then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movl_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movl $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if n != v then *rd <- *rs2 else skip
+   ]
+}
+defop movl_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movl $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if n != v then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movgu_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movgu $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b0 && z == 0b0 then *rd <- *rs2 else skip
+   ]
+}
+defop movgu_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movgu $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b0 && z == 0b0 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movleu_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movleu $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b1 || z == 0b1 then *rd <- *rs2 else skip
+   ]
+}
+defop movleu_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movleu $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let z: 1 bit = if use64 then *xzf else *izf in
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b1 || z == 0b1 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movcc_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movcc $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b0 then *rd <- *rs2 else skip
+   ]
+}
+defop movcc_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movcc $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b0 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movcs_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movcs $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b1 then *rd <- *rs2 else skip
+   ]
+}
+defop movcs_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movcs $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let c: 1 bit = if use64 then *xcf else *icf in
+      if c == 0b1 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movpos_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movpos $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      if n == 0b0 then *rd <- *rs2 else skip
+   ]
+}
+defop movpos_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movpos $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      if n == 0b0 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movneg_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movneg $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      if n == 0b1 then *rd <- *rs2 else skip
+   ]
+}
+defop movneg_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movneg $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let n: 1 bit = if use64 then *xnf else *inf in
+      if n == 0b1 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movvc_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movvc $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if v == 0b0 then *rd <- *rs2 else skip
+   ]
+}
+defop movvc_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movvc $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if v == 0b0 then *rd <- signextend11(imm) else skip
+   ]
+}
+defop movvs_r use64:bool rs2:gpreg rd:gpreg {
+   txt = format("movvs $1, $2, $3",
+                if use64 then "%xcc" else "%icc", rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs2) && is_gpreg(rd));
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if v == 0b1 then *rd <- *rs2 else skip
+   ]
+}
+defop movvs_i use64:bool imm:simm11 rd:gpreg {
+   txt = format("movvs $1, $2, $3",
+                if use64 then "%xcc" else "%icc", imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      let v: 1 bit = if use64 then *xvf else *ivf in
+      if v == 0b1 then *rd <- signextend11(imm) else skip
+   ]
+}
+
+(* A.36 move integer register on register condition *)
+defop movrz_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("movrz $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      if *rs1 == 0x0000000000000000 then *rd <- *rs2 else skip 
+   ]
+}
+defop movrz_i rs1:gpreg imm:simm10 rd:gpreg {
+   txt = format("movrz $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      if *rs1 == 0x0000000000000000 then *rd <- signextend10(imm) else skip 
+   ]
+}
+defop movrlez_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("movrlez $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      if *rs1 == 0x0000000000000000 || *rs1 bs< 0x0000000000000000 then
+         *rd <- *rs2
+      else skip
+   ]
+}
+defop movrlez_i rs1:gpreg imm:simm10 rd:gpreg {
+   txt = format("movrlez $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      if *rs1 == 0x0000000000000000 || *rs1 bs< 0x0000000000000000 then
+         *rd <- signextend10(imm)
+      else skip
+   ]
+}
+defop movrlz_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("movrlz $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      if *rs1 bs< 0x0000000000000000 then *rd <- *rs2 else skip 
+   ]
+}
+defop movrlz_i rs1:gpreg imm:simm10 rd:gpreg {
+   txt = format("movrlz $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      if *rs1 bs< 0x0000000000000000 then *rd <- signextend10(imm) else skip 
+   ]
+}
+defop movrnz_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("movrnz $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      if *rs1 != 0x0000000000000000 then *rd <- *rs2 else skip 
+   ]
+}
+defop movrnz_i rs1:gpreg imm:simm10 rd:gpreg {
+   txt = format("movrnz $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      if *rs1 != 0x0000000000000000 then *rd <- signextend10(imm) else skip 
+   ]
+}
+defop movrgz_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("movrgz $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      if *rs1 bs> 0x0000000000000000 then *rd <- *rs2 else skip 
+   ]
+}
+defop movrgz_i rs1:gpreg imm:simm10 rd:gpreg {
+   txt = format("movrgz $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      if *rs1 bs> 0x0000000000000000 then *rd <- signextend10(imm) else skip 
+   ]
+}
+defop movrgez_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("movrgez $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      if *rs1 == 0x0000000000000000 || *rs1 bs> 0x0000000000000000 then
+         *rd <- *rs2
+      else skip
+   ]
+}
+defop movrgez_i rs1:gpreg imm:simm10 rd:gpreg {
+   txt = format("movrgez $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      if *rs1 == 0x0000000000000000 || *rs1 bs> 0x0000000000000000 then
+         *rd <- signextend10(imm)
+      else skip
+   ]
+}
+
+(* A.37 multiply and divide *)
+(*defop mulx_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("mulx $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 b* *rs2
+   ]
+}*)
+(*defop mulx_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("mulx $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 b* signextend13(imm)
+   ]
+}*)
+(*defop sdivx_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("sdivx $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      assert( *rs2 != 0x0000000000000000);
+      *rd <- *rs1 b* *rs2 (* XXX should be b/ *)
+   ]
+}*)
+(*defop sdivx_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("sdivx $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      assert(imm != 0b0000000000000);
+      *rd <- *rs1 b* signextend13(imm) (* XXX should be b/ *)
+   ]
+}*)
+(*defop udivx_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("udivx $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      assert( *rs2 != 0x0000000000000000);
+      *rd <- *rs1 b* *rs2 (* XXX should be ub/ *)
+   ]
+}*)
+(*defop udivx_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("udivx $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      assert(imm != 0b0000000000000);
+      *rd <- *rs1 b* signextend13(imm) (* XXX should be ub/ *)
+   ]
+}*)
+
+(* A.43 read privileged register *)
+(*defop rdpr_tpc rd:gpreg {
+   txt = format("rdpr %tpc, $1", rd.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rd));
+      *rd <- *tpc
+   ]
+}*)
+(*defop rdpr_tnpc rd:gpreg {
+   txt = format("rdpr %tnpc, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *tnpc
+   ]
+}*)
+(*defop rdpr_tstate rd:gpreg {
+   txt = format("rdpr %tstate, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *tstate
+   ]
+}*)
+(*defop rdpr_tt rd:gpreg {
+   txt = format("rdpr %tt, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *tt
+   ]
+}*)
+(*defop rdpr_tick rd:gpreg {
+   txt = format("rdpr %tick, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *tick
+   ]
+}*)
+(*defop rdpr_tba rd:gpreg {
+   txt = format("rdpr %tba, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *tba
+   ]
+}*)
+(*defop rdpr_pstate rd:gpreg {
+   txt = format("rdpr %pstate, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *pstate
+   ]
+}*)
+(*defop rdpr_tl rd:gpreg {
+   txt = format("rdpr %tl, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *tl
+   ]
+}*)
+(*defop rdpr_pil rd:gpreg {
+   txt = format("rdpr %pil, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *pil
+   ]
+}*)
+(*defop rdpr_cwp rd:gpreg {
+   txt = format("rdpr %cwp, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *cwp
+   ]
+}*)
+(*defop rdpr_cansave rd:gpreg {
+   txt = format("rdpr %cansave, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *cansave
+   ]
+}*)
+(*defop rdpr_canrestore rd:gpreg {
+   txt = format("rdpr %canrestore, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *canrestore
+   ]
+}*)
+(*defop rdpr_cleanwin rd:gpreg {
+   txt = format("rdpr %cleanwin, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *cleanwin
+   ]
+}*)
+(*defop rdpr_otherwin rd:gpreg {
+   txt = format("rdpr %otherwin, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *otherwin
+   ]
+}*)
+(*defop rdpr_wstate rd:gpreg {
+   txt = format("rdpr %wstate, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *wstate
+   ]
+}*)
+(*defop rdpr_fq rd:gpreg {
+   txt = format("rdpr %fq, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *fq
+   ]
+}*)
+(*defop rdpr_ver rd:gpreg {
+   txt = format("rdpr %ver, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *ver
+   ]
+}*)
+
+(* A.44 read state register *)
+(*defop rdccr rd:gpreg {
+   txt = format("rd %ccr, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- readccr()
+   ]
+}*)
+(*defop rdasi rd:gpreg {
+   txt = format("rd %asi, $1", rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- *asi
+   ]
+}*)
+
+(* A.49 shift *)
+(*defop sll_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("sll $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 << ( *rs2 & 0x000000000000001f)
+   ]
+}*)
+(*defop sll_i rs1:gpreg imm:uimm5 rd:gpreg {
+   txt = format("sll $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 << bv_to_len(64, imm)
+   ]
+}*)
+defop sllx_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("sllx $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 << ( *rs2 & 0x000000000000003f)
+   ]
+}
+defop sllx_i rs1:gpreg imm:uimm6 rd:gpreg {
+   txt = format("sllx $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 << bv_to_len(64, imm)
+   ]
+}
+(*defop sra_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("sra $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let amt: word = *rs2 & 0x000000000000001f in
+      let lo: word = ( *rs1 & 0x00000000ffffffff) >> amt in
+      if ( *rs1)[31] then
+         let otheramt: word = 0x0000000000000020 b- amt in
+         let hi: word = 0xffffffffffffffff << otheramt in
+         *rd <- hi | lo
+      else
+         *rd <- lo
+   ]
+}*)
+(*defop sra_i rs1:gpreg imm:uimm5 rd:gpreg {
+   txt = format("sra $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let amt: word = bv_to_len(64, imm) in
+      let lo: word = ( *rs1 & 0x00000000ffffffff) >> amt in
+      if ( *rs1)[31] then
+         let otheramt: word = 0x0000000000000020 b- amt in
+         let hi: word = 0xffffffffffffffff << otheramt in
+         *rd <- hi | lo
+      else
+         *rd <- lo
+   ]
+}*)
+defop srax_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("srax $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let amt: word = *rs2 & 0x000000000000003f in
+      let lo: word = *rs1 >> amt in
+      if ( *rs1)[63] then
+         let otheramt: word = 0x0000000000000040 b- amt in
+         let hi: word = 0xffffffffffffffff << otheramt in
+         *rd <- hi | lo
+      else
+         *rd <- lo
+   ]
+}
+defop srax_i rs1:gpreg imm:uimm6 rd:gpreg {
+   txt = format("srax $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let amt: word = bv_to_len(64, imm) in
+      let lo: word = *rs1 >> amt in
+      if ( *rs1)[63] then
+         let otheramt: word = 0x0000000000000040 b- amt in
+         let hi: word = 0xffffffffffffffff << otheramt in
+         *rd <- hi | lo
+      else
+         *rd <- lo
+   ]
+}
+(*defop srl_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("srl $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let amt: word = *rs2 & 0x000000000000001f in
+      *rd <- ( *rs1 & 0x00000000ffffffff) >> amt
+   ]
+}*)
+(*defop srl_i rs1:gpreg imm:uimm5 rd:gpreg {
+   txt = format("srl $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let amt: word = bv_to_len(64, imm) in
+      *rd <- ( *rs1 & 0x00000000ffffffff) >> amt
+   ]
+}*)
+defop srlx_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("srlx $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let amt: word = *rs2 & 0x000000000000003f in
+      *rd <- *rs1 >> amt
+   ]
+}
+defop srlx_i rs1:gpreg imm:uimm6 rd:gpreg {
+   txt = format("srlx $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let amt: word = bv_to_len(64, imm) in
+      *rd <- *rs1 >> amt
+   ]
+}
+
+(* A.54 store integer *)
+(*defop stb_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("stb $3, [$1 + $2]", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      store[addr, 8] <- bv_to_len(8, *rd & 0x00000000000000ff)
+   ]
+}*)
+(*defop stb_i rs1:gpreg off:simm13 rd:gpreg {
+   txt = format("stb $3, [$1 + $2]", rs1.txt, off.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let addr: word = *rs1 b+ signextend13(off) in
+      store[addr, 8] <- bv_to_len(8, *rd & 0x00000000000000ff)
+   ]
+}*)
+defop stw_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("stw $3, [$1 + $2]", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      store[addr, 32] <- bv_to_len(32, *rd & 0x00000000ffffffff)
+   ]
+}
+defop stw_i rs1:gpreg off:simm13 rd:gpreg {
+   txt = format("stw $3, [$1 + $2]", rs1.txt, off.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let addr: word = *rs1 b+ signextend13(off) in
+      store[addr, 32] <- bv_to_len(32, *rd & 0x00000000ffffffff)
+   ]
+}
+defop stx_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("stx $3, [$1 + $2]", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      store[addr, 64] <- *rd
+   ]
+}
+defop stx_i rs1:gpreg off:simm13 rd:gpreg {
+   txt = format("stx $3, [$1 + $2]", rs1.txt, off.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let addr: word = *rs1 b+ signextend13(off) in
+      store[addr, 64] <- *rd
+   ]
+}
+
+(* A.55 store integer into alternate space *)
+(* XXX can't do these yet, don't have userspace pointers *)
+(*defop stb_user rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("stba $3, [$1 + $2] #ASI_AS_IF_USER_PRIMARY",
+                rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      store[addr, 8] <- bv_to_len(8, *rd & 0x00000000000000ff)
+   ]
+}*)
+(*defop stw_user rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("stwa $3, [$1 + $2] #ASI_AS_IF_USER_PRIMARY",
+                rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      store[addr, 32] <- bv_to_len(32, *rd & 0x00000000ffffffff)
+   ]
+}*)
+(*defop stx_user rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("stxa $3, [$1 + $2] #ASI_AS_IF_USER_PRIMARY",
+                rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let addr: word = *rs1 b+ *rs2 in
+      store[addr, 64] <- *rd
+   ]
+}*)
+
+(* A.56 subtract *)
+proc setflags_sub result:word a:word b:word =
+   *xnf <- if result[63] then 0b1 else 0b0;
+   *xzf <- if result == 0x0000000000000000 then 0b1 else 0b0;
+   *xvf <- if a[63] == !b[63] && result[63] != a[63] then 0b1 else 0b0;
+   *xcf <- if (if *xvf == 0b1 then !result[63] else result[63]) then 0b1
+           else 0b0;
+   *inf <- if result[31] then 0b1 else 0b0;
+   *izf <- if (result & 0x00000000ffffffff) == 0x0000000000000000 then 0b1
+           else 0b0;
+   *ivf <- if result[32] != result[31] then 0b1 else 0b0;
+   *icf <- if result[32] then 0b1 else 0b0
+defop sub_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("sub $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      *rd <- *rs1 b- *rs2
+   ]
+}
+defop sub_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("sub $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      *rd <- *rs1 b- signextend13(imm)
+   ]
+}
+defop subcc_r rs1:gpreg rs2:gpreg rd:gpreg {
+   txt = format("subcc $1, $2, $3", rs1.txt, rs2.txt, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2) && is_gpreg(rd));
+      let result: word = *rs1 b- *rs2 in
+      setflags_sub(result, *rs1, *rs2);
+      *rd <- result
+   ]
+}
+defop subcc_i rs1:gpreg imm:simm13 rd:gpreg {
+   txt = format("subcc $1, $2, $3", rs1.txt, imm.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rd));
+      let v2: word = signextend13(imm) in
+      let result: word = *rs1 b- v2 in
+      setflags_sub(result, *rs1, v2);
+      *rd <- result
+   ]
+}
+
+(* A.62 write privileged register *)
+(*defop wrpr_tpc_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %tpc", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *tpc <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_tpc_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %tpc", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *tpc <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_tnpc_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %tnpc", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *tnpc <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_tnpc_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %tnpc", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *tnpc <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_tstate_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %tstate", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *tstate <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_tstate_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %tstate", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *tstate <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_tt_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %tt", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *tt <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_tt_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %tt", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *tt <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_tick_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %tick", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *tick <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_tick_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %tick", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *tick <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_tba_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %tba", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *tba <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_tba_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %tba", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *tba <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_pstate_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %pstate", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *pstate <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_pstate_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %pstate", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *pstate <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_tl_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %tl", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *tl <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_tl_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %tl", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *tl <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_pil_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %pil", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *pil <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_pil_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %pil", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *pil <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_cwp_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %cwp", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *cwp <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_cwp_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %cwp", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *cwp <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_cansave_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %cansave", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *cansave <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_cansave_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %cansave", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *cansave <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_canrestore_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %canrestore", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *canrestore <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_canrestore_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %canrestore", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *canrestore <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_cleanwin_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %cleanwin", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *cleanwin <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_cleanwin_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %cleanwin", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *cleanwin <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_otherwin_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %otherwin", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *otherwin <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_otherwin_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %otherwin", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *otherwin <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(*defop wrpr_wstate_r rs1:gpreg rs2:gpreg {
+   txt = format("wrpr $1, $2, %wstate", rs1.txt, rs2.txt),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *wstate <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrpr_wstate_i rs1:gpreg imm:simm13 {
+   txt = format("wrpr $1, $2, %wstate", rs1.txt, imm.hex),
+   sem = [
+      (* XXX must be in supervisor mode *)
+      assert(is_gpreg(rs1));
+      *wstate <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+(* note: the %fq and %ver registers can't be written *)
+
+(* A.63 write state register *)
+(*defop wrccr_r rs1:gpreg rs2:gpreg {
+   txt = format("wr $1, $2, %ccr", rs1.txt, rs2.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      writeccr( *rs1 ^ *rs2)
+   ]
+}*)
+(*defop wrccr_i rs1:gpreg imm:simm13 {
+   txt = format("wr $1, $2, %ccr", rs1.txt, imm.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      writeccr( *rs1 ^ signextend13(imm))
+   ]
+}*)
+(*defop wrasi_r rs1:gpreg rs2:gpreg {
+   txt = format("wr $1, $2, %asi", rs1.txt, rs2.txt),
+   sem = [
+      assert(is_gpreg(rs1) && is_gpreg(rs2));
+      *asi <- *rs1 ^ *rs2
+   ]
+}*)
+(*defop wrasi_i rs1:gpreg imm:simm13 {
+   txt = format("wr $1, $2, %asi", rs1.txt, imm.hex),
+   sem = [
+      assert(is_gpreg(rs1));
+      *asi <- *rs1 ^ signextend13(imm)
+   ]
+}*)
+
+(* synthetics *)
+defop setx x:word rd:gpreg {
+   txt = format("setx $1, $2", x.hex, rd.txt),
+   sem = [
+      assert(is_gpreg(rd));
+      *rd <- x
+   ]
+}

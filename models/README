@@ -1,0 +1,18 @@
+These are transcriptions of the abstract syntax, semantics, and typing
+rules from the languages tech report.
+
+There are also proofs of type soundness (preservation and progress)
+for both casp and alewife.
+
+Current basis is:
+   commit 6325121e000d4e3ba2887ebd2d101ba1e6f854ee (20190712)
+   from master branch of documents repo
+   (fixed a bunch of obvious typos found while preparing this transcription)
+
+Prior basis:
+   commit 252ee2e5d57059bb71436cdc40653b3c62d791f2 (20190701)
+   from master branch of documents repo
+   which is a merge of
+   commit deca0a69ffaadb5a8667b68e8b6c34bb687fce91 (20190621)
+   from crystal-lang branch of documents repo
+

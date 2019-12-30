@@ -1,0 +1,672 @@
+let wordsize: int = 32
+type word = 32 bit
+type halfword = 16 bit
+type byte = 8 bit
+type gpreg = word loc
+type flag = 1 bit
+type freg = flag loc 
+
+letstate r0: (*const*) gpreg (* z0 *)
+letstate r1: gpreg (* AT *)
+letstate r2: gpreg (* v0 *)
+letstate r3: gpreg (* v1 *)
+letstate r4: gpreg (* a0 *)
+letstate r5: gpreg (* a1 *)
+letstate r6: gpreg (* a2 *)
+(* letstate r7: gpreg (* a3 *)
+letstate r8: gpreg (* t0 *)
+letstate r9: gpreg (* t1 *)
+letstate r10: gpreg (* t2 *)
+letstate r11: gpreg (* t3 *)
+letstate r12: gpreg (* t4 *)
+letstate r13: gpreg (* t5 *)
+letstate r14: gpreg (* t6 *)
+letstate r15: gpreg (* t7 *)
+letstate r16: gpreg (* s0 *)
+letstate r17: gpreg (* s1 *)
+letstate r18: gpreg (* s2 *)
+letstate r19: gpreg (* s3 *)
+letstate r20: gpreg (* s4 *)
+letstate r21: gpreg (* s5 *)
+letstate r22: gpreg (* s6 *)
+letstate r23: gpreg (* s7 *)
+letstate r24: gpreg (* t8 *)
+letstate r25: gpreg (* t9 *)
+letstate r26: gpreg (* k0 *)
+letstate r27: gpreg (* k1 *) *)
+letstate r28: gpreg (* gp *)
+(* letstate r29: gpreg (* sp *)
+letstate r30: gpreg (* s8/fp *)
+letstate r31: gpreg (* ra *) *)
+
+let r0.txt = "$0"
+let r1.txt = "$1"
+let r2.txt = "$2"
+let r3.txt = "$3"
+let r4.txt = "$4"
+let r5.txt = "$5"
+let r6.txt = "$6"
+let r28.txt = "$gp"
+(*
+ * MIPS control flags
+ *
+ * cp0_12_ie is the interrupt enable bit. *)
+
+(* cp0 $0: INDEX *)
+letstate cp0_0_p: freg
+letstate cp0_0_index: 6 bit loc
+
+(* cp0 $2: ENTRYLO *)
+letstate cp0_2_ppage: 20 bit loc
+letstate cp0_2_d: freg
+letstate cp0_2_v: freg
+letstate cp0_2_g: freg
+
+(* cp0 $4: CONTEXT *)
+letstate cp0_4_base: 9 bit loc
+letstate cp0_4_badvaddr: 19 bit loc
+
+(* cp0 $8: BADVADDR *)
+letstate cp0_8_badvaddr: 32 bit loc
+
+(* cp0 $9: COUNT *)
+(* XXX: this changes spontaneously so we need to think about how to model it *)
+(*letstate cp0_9_count: 32 bit loc *)
+
+(* cp0 $10: ENTRYHI *)
+letstate cp0_10_vpage: 20 bit loc
+letstate cp0_10_asid: 6 bit loc
+
+(* cp0 $11: COMPARE *)
+letstate cp0_11_compare: 32 bit loc
+let cp0_11_compare.txt = "cp0 $11"
+
+(* cp0 $12: STATUS *)
+letstate cp0_12_ce: 4 bit loc
+letstate cp0_12_rp: freg
+letstate cp0_12_fr: freg
+letstate cp0_12_re: freg
+letstate cp0_12_mx: freg
+letstate cp0_12_px: freg
+letstate cp0_12_bev: freg
+letstate cp0_12_ts: freg
+letstate cp0_12_sr: freg
+letstate cp0_12_nmi: freg
+letstate cp0_12_mask: 8 bit loc
+letstate cp0_12_kx: freg
+letstate cp0_12_sx: freg
+letstate cp0_12_ux: freg
+letstate cp0_12_ksu: 2 bit loc
+letstate cp0_12_erl: freg
+letstate cp0_12_exl: freg
+letstate cp0_12_ie: freg
+
+(* cp0 $13: CAUSE *)
+letstate cp0_13_bd: freg
+letstate cp0_13_ce: 2 bit loc
+letstate cp0_13_iv: freg
+letstate cp0_13_wp: freg
+letstate cp0_13_pending: 8 bit loc
+letstate cp0_13_code: 5 bit loc
+
+(* cp0 $14: EPC *)
+letstate cp0_14_epc: 32 bit loc
+
+(* cp $15: PRID *)
+letstate cp0_15_options: 8 bit loc
+letstate cp0_15_vendor: 8 bit loc
+letstate cp0_15_model: 8 bit loc
+letstate cp0_15_revision: 8 bit loc
+
+(* cp $16: CONFIG *)
+letstate cp0_16_m: freg
+letstate cp0_16_be: freg
+letstate cp0_16_at: 2 bit loc
+letstate cp0_16_ar: 3 bit loc
+letstate cp0_16_mt: 3 bit loc
+letstate cp0_16_k0: 3 bit loc
+
+(* cp $16.1: CONFIG1 *)
+letstate cp0_16_1_m: freg
+letstate cp0_16_1_tlbsize: 6 bit loc
+letstate cp0_16_1_is: 3 bit loc
+letstate cp0_16_1_il: 3 bit loc
+letstate cp0_16_1_ia: 3 bit loc
+letstate cp0_16_1_ds: 3 bit loc
+letstate cp0_16_1_dl: 3 bit loc
+letstate cp0_16_1_da: 3 bit loc
+letstate cp0_16_1_c2: freg
+letstate cp0_16_1_md: freg
+letstate cp0_16_1_pc: freg
+letstate cp0_16_1_wr: freg
+letstate cp0_16_1_ca: freg
+letstate cp0_16_1_ep: freg
+letstate cp0_16_1_fp: freg
+
+(* cp $16.2: CONFIG2 *)
+letstate cp0_16_2_m: freg
+letstate cp0_tbs: 31 bit loc
+
+(* cp $16.3: CONFIG3 *)
+letstate cp0_16_3_m: freg
+letstate cp0_sm: freg
+letstate cp0_tl: freg
+
+(* cp $17: LLADDR *)
+letstate cp0_17_lladdr: 32 bit loc
+let cp0_17_lladdr.txt = "cp0 $17"
+
+(*****************************************************************************************)
+
+invariant: *r0 == 0x00000000
+
+let wordzero : word = 0x00000000
+let wordone : word = 0x00000001
+(* letstate mem_argv: 32 bit 4 len 32 ref memory
+letstate mem_environ: 32 bit 4 len 32 ref memory *)
+
+(* Load 16-bit signed immediate *)
+def read_simm16 (imm: 16 bit) -> 32 bit =
+	let tmp: 32 bit = bv_to_len(32, imm) in
+        if (imm & 0b1000000000000000) != 0b0000000000000000 then
+           tmp | 0b11111111111111110000000000000000
+        else tmp
+
+(* Load 16-bit unsigned immediate *)
+def read_uimm16 (imm: 16 bit) -> 32 bit =
+	bv_to_len(32, imm)
+
+(* Load 5-bit unsigned immediate *)
+def read_uimm5 (imm: 5 bit) -> 32 bit =
+	bv_to_len(32, imm)
+
+(* Signed shift-right *)
+def signedshift (x: 32 bit) (amt: 5 bit) -> 32 bit =
+        let tmp: 32 bit = x >> bv_to_len(32, amt) in
+        if (x & 0b10000000000000000000000000000000) != 0b00000000000000000000000000000000 then
+           let lsamt: 5 bit = (0b11111 b- amt) b+ 0b00001 (* 32 - amt *) in
+           let ones: 32 bit = 0b11111111111111111111111111111111 in
+           tmp | (ones << bv_to_len(32, lsamt))
+        else tmp
+
+(* Produce zero or one *)
+def truthval (x: bool) -> 32 bit =
+	x ? 0b00000000000000000000000000000001
+          : 0b00000000000000000000000000000000
+
+def is_gpreg (x: gpreg) -> bool = 
+  switch x: gpreg with
+    case r0 -> true
+    case r1 -> true
+    case r2 -> true
+    case r3 -> true
+    case r4 -> true
+    case r5 -> true
+    case r6 -> true
+    case r28 -> true
+    case _ -> false
+  end
+(*
+ * arithmetic
+ *)
+
+defop ADDU rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("addu $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "addu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs b+ *rt]
+}
+
+defop ADDIU rd:gpreg rs:gpreg simm16:16 bit {
+   txt = format("addiu $1, $2, $3", rd.txt, rs.txt, simm16.dec),
+   (* txt = "addiu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs b+ read_simm16(simm16) ]
+}
+
+defop SUBU rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("subu $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs b- *rt ]
+}
+
+defop LUI rd:gpreg uimm16:16 bit {
+   txt = format("lui $1, 0x$2", rd.txt, uimm16.hex),
+   (* txt = "lui " ++ rd.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd));
+            if rd == r0 then skip else *rd <- read_uimm16(uimm16) << 0x00000010 ]
+}
+
+(*
+ * comparisons
+ *)
+
+defop SLT rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("slt $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "slt " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- truthval( *rs bs< *rt) ]
+}
+
+defop SLTI rd:gpreg rs:gpreg simm16:16 bit {
+   txt = format("slti $1, $2, $3", rd.txt, rs.txt, simm16.dec),
+   (* txt = "slti " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- truthval( *rs bs< read_simm16(simm16)) ]
+}
+
+defop SLTU rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("sltu $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "slt " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- truthval( *rs b< *rt) ]
+}
+
+defop SLTIU rd:gpreg rs:gpreg simm16:16 bit {
+   txt = format("sltiu $1, $2, $3", rd.txt, rs.txt, simm16.dec),
+   (* txt = "sltiu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- truthval( *rs b< read_simm16(simm16)) ]
+}
+
+(*
+ * bitwise ops
+ *)
+
+defop AND rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("and $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "and " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs & *rt ]
+}
+
+defop ANDI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = format("andi $1, $2, 0x$3", rd.txt, rs.txt, uimm16.hex),
+   (* txt = "andi " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs & read_uimm16(uimm16) ]
+}
+
+defop NOR rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("nor $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "nor " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs | ~( *rt) ]
+}
+
+defop OR rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("or $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "or " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs | *rt ]
+}
+
+defop ORI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = format("ori $1, $2, 0x$3", rd.txt, rs.txt, uimm16.hex),
+   (* txt = "ori " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs | read_uimm16(uimm16) ]
+}
+
+defop XOR rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("xor $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "or " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs ^ *rt ]
+}
+
+defop XORI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = format("xori $1, $2, 0x$3", rd.txt, rs.txt, uimm16.hex),
+   (* txt = "ori " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs ^ read_uimm16(uimm16) ]
+}
+
+(*
+ * shifts
+ *)
+
+defop SLLV rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("sllv $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "sllv " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs << ( *rt & 0x0000001F) ]
+}
+
+defop SLL rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = format("sll $1, $2, $3", rd.txt, rs.txt, uimm5.dec),
+   (* txt = "sll " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs << read_uimm5(uimm5) ]
+}
+
+defop SRAV rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("srav $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "srav " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip 
+            else let drt: word = *rt in
+              *rd <- signedshift( *rs, (drt[0:5] & 0b11111)) ]
+}
+
+defop SRA rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = format("sra $1, $2, $3", rd.txt, rs.txt, uimm5.dec),
+   (* txt = "sra " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- signedshift( *rs, uimm5) ]
+}
+
+defop SRLV rd:gpreg rs:gpreg rt:gpreg {
+   txt = format("srlv $1, $2, $3", rd.txt, rs.txt, rt.txt),
+   (* txt = "srlv " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+            if rd == r0 then skip else *rd <- *rs >> ( *rt & 0x0000001F) ]
+}
+
+defop SRL rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = format("srl $1, $2, $3", rd.txt, rs.txt, uimm5.dec),
+   (* txt = "srl " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt, *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            if rd == r0 then skip else *rd <- *rs >> read_uimm5(uimm5) ]
+}
+(*
+ * move conditional
+ *)
+defop MOVN rd:gpreg rs: gpreg rt: gpreg {
+  txt = format("movn $1, $2, $3", rd.txt, rs.txt, rt.txt),
+  sem = [ assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+          if rd == r0 then skip
+          else if *rt != 0x00000000 then *rd <- *rs else skip ]
+}
+defop MOVZ rd:gpreg rs: gpreg rt: gpreg {
+  txt = format("movz $1, $2, $3", rd.txt, rs.txt, rt.txt),
+  sem = [ assert(is_gpreg(rd)); assert(is_gpreg(rs)); assert(is_gpreg(rt));
+          if rd == r0 then skip 
+          else if *rt == 0x00000000 then *rd <- *rs else skip ]
+}
+(*
+ * memory
+ *)
+
+(* lw r1, (X)r2 -> load from [r2 + X] and put the content into [r1] *)
+defop LW rd:gpreg rs:gpreg offset:16 bit {
+   txt = format("lw $1, $2($3)", rd.txt, offset.dec, rs.txt),
+   (* txt = "lw " ++ rd.txt ++ ", " ++ offset.txt ++ "(" ++ rs.txt ++ ")", *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            let addr: word = *rs b+ read_simm16(offset) in
+            if rd == r0 then skip else *rd <- fetch[addr, 32] ]  
+}
+
+defop SW rd:gpreg rs:gpreg offset:16 bit {
+   txt = format("sw $1, $2($3)", rd.txt, offset.dec, rs.txt),
+   (* txt = "sw " ++ rd.txt ++ ", " ++ offset.txt ++ "(" ++ rs.txt ++ ")", *)
+   sem = [  assert(is_gpreg(rd)); assert(is_gpreg(rs));
+            let addr: word = *rs b+ read_simm16(offset) in
+            store[addr, 32] <- *rd ]  
+}
+
+(* la r, symbol -> put [symbol] into [r] *)
+defop LA rd:gpreg addr: 32 label {
+   txt = format("la $1, $2", rd.txt, addr.lbl),
+   (* txt = "la " ++ rd.txt ++ addr.txt, *)
+   sem = [ assert(is_gpreg(rd)); *rd <- addr ]  
+}
+
+defop LI rd:gpreg val:word {
+  txt = format("li $1, 0x$2", rd.txt, val.hex),
+  (* txt = "li " ++ rd.txt ++ val.txt, *)
+  sem = [ assert(is_gpreg(rd)); *rd <- val ]
+}
+
+defop SW_lbl rd:gpreg addr: 32 label {
+   txt = format("sw $1, $2", rd.txt, addr.lbl),
+   (* txt = "sw " ++ rd.txt ++ addr.txt, *)
+   sem = [ assert(is_gpreg(rd)); store[addr, 32] <- *rd ]  
+}
+
+(* defop SETREG rd:gpreg sh:word {
+  txt = "SETREG" ++ rd.txt ++ sh.txt,
+  sem = [ *rd <- sh ]
+} *)
+
+(*
+ * WARNING: it seems that val[0:5] means bits 0..4, not 0..5, so
+ * all of the bitslicing looks severely misleading.
+ *
+ * Also it seems that "val[0]" silently converts 1 bit to boolean, so
+ * you need to use val[0:1] to get bit 0 of val.
+ *)
+
+defop MTC0 src:gpreg dst:5 bit sel:3 bit {
+   txt = format("mtc0 $1, $$$2, $3", src.txt, dst.dec, sel.dec),
+   (* txt = "mfc0 " ++ src.txt ++ ", $" ++ dst.txt ++ ", " ++ sel.txt, *)
+   sem = [ assert(is_gpreg(src));      
+      let val: 32 bit = *src in
+      if dst == 0b00000 && sel == 0b000 then
+         (* INDEX *)
+         (* cp0_0_p is readonly; ignore bit 31 *)
+         assert val[6:31] == 0b0000000000000000000000000;
+         *cp0_0_index <- val[0:6]
+      else if dst == 0b00001 && sel == 0b000 then
+         (* RANDOM *)
+         assert false (* notyet *)
+      else if dst == 0b00010 && sel == 0b000 then
+         (* ENTRYLO *)
+         *cp0_2_ppage <- val[12:32];
+         (* bits 3-11 ignored *)
+         *cp0_2_d <- val[2:3];
+         *cp0_2_v <- val[1:2];
+         *cp0_2_g <- val[0:1]
+      else if dst == 0b00100 && sel == 0b000 then
+         (* CONTEXT *)
+         *cp0_4_base <- val[23:32];
+         (* bits 4-22 are readonly; write is ignored *)
+         assert val[0:4] == 0b0000
+      else if dst == 0b01000 && sel == 0b000 then
+         (* BADVADDR *)
+         *cp0_8_badvaddr <- val
+      else if dst == 0b01001 && sel == 0b000 then
+         (* COUNT *)
+         assert false (* notyet *)
+      else if dst == 0b01010 && sel == 0b000 then
+         (* ENTRYHI *)
+         *cp0_10_vpage <- val[12:32];
+         (* bits 6-11 ignored *)
+         *cp0_10_asid <- val[0:6]
+      else if dst == 0b01011 && sel == 0b000 then
+         (* COMPARE *)
+         *cp0_11_compare <- val
+      else if dst == 0b01100 && sel == 0b000 then
+         (* STATUS *)
+         *cp0_12_ce <- val[28:32];
+         *cp0_12_rp <- val[27:28];
+         *cp0_12_fr <- val[26:27];
+         *cp0_12_re <- val[25:26];
+         *cp0_12_mx <- val[24:25];
+         *cp0_12_px <- val[23:24];
+         *cp0_12_bev <- val[22:23];
+         *cp0_12_ts <- val[21:22];
+         (* writing a 0 -> 1 transition causes UNPREDICTABLE *)
+         assert *cp0_12_sr == 0b1 || val[20:21] == 0b0;
+         *cp0_12_sr <- val[20:21];
+         (* writing a 0 -> 1 transition causes UNPREDICTABLE *)
+         assert *cp0_12_nmi == 0b1 || val[19:20] == 0b0;
+         *cp0_12_nmi <- val[19:20];
+         assert val[18:19] == 0b0;
+         (* bits 16-17 ignored *)
+         *cp0_12_mask <- val[8:16];
+         *cp0_12_kx <- val[7:8];
+         *cp0_12_sx <- val[6:7];
+         *cp0_12_ux <- val[5:6];
+         *cp0_12_ksu <- val[3:5];
+         *cp0_12_erl <- val[2:3];
+         *cp0_12_exl <- val[1:2];
+         *cp0_12_ie <- val[0:1]
+      else if dst == 0b01101 && sel == 0b000 then
+         (* CAUSE *)
+(* # bits 31, 28-29, 10-15, 2-6 are readonly, writes ignored *)
+         *cp0_13_iv <- val[23:24];
+         (* writing a 0 -> 1 transition causes UNPREDICTABLE *)
+         assert *cp0_13_wp == 0b1 || val[22:23] == 0b0;
+         *cp0_13_wp <- val[22:23];
+         *cp0_13_pending <-
+    bv_to_len(8, ( *cp0_13_pending)[2:8]) |
+    bv_to_len(8, val[8:10]);
+         (* other bits must be 0 *)
+         assert val[30:31] == 0b0;
+         assert val[24:28] == 0b0000;
+         assert val[16:22] == 0b000000;
+         assert val[7:8] == 0b0;
+         assert val[0:2] == 0b00
+      else if dst == 0b01110 && sel == 0b000 then
+         (* EPC *)
+         *cp0_14_epc <- val
+      else if dst == 0b01111 && sel == 0b000 then
+         (* PRID *)
+         (* readonly; writes ignored *)
+         skip
+      else if dst == 0b10000 && sel == 0b000 then
+         (* CONFIG *)
+         (* mostly readonly; writes ignored, except k0 *)
+         *cp0_16_k0 <- val[0:3];
+         (* some zero bits must be zero *)
+         assert val[3:7] == 0b0000
+      else if dst == 0b10000 && sel == 0b001 then
+         (* CONFIG1 *)
+         (* readonly; writes ignored *)
+         skip
+      else if dst == 0b10000 && sel == 0b010 then
+         (* CONFIG2 *)
+         (* readonly; writes ignored *)
+         skip
+      else if dst == 0b10000 && sel == 0b011 then
+         (* CONFIG3 *)
+         (* readonly; writes ignored, but bits 2-30 must be 0 *)
+         assert val[2:31] == 0b00000000000000000000000000000
+      else if dst == 0b10001 && sel == 0b000 then
+         (* LLADDR *)
+         (* readonly; writes ignored *)
+         skip
+      else
+         (* wrong *)
+         assert false
+   ]
+}
+
+defop MFC0 dst:gpreg src:5 bit sel:3 bit {
+   txt = format("mfc0 $1, $$$2, $3", dst.txt, src.dec, sel.dec),
+   (* txt = "mfc0 " ++ dst.txt ++ ", $" ++ src.txt ++ ", " ++ sel.txt, *)
+   sem = [ assert(is_gpreg(dst)); 
+      (* XXX *) let fail: 32 bit = 0xdeadbeef in
+      let result: 32 bit =
+         if src == 0b00000 && sel == 0b000 then
+            (* INDEX *)
+            (bv_to_len(32, *cp0_0_p) << 0x0000001f (*31*)) |
+                (bv_to_len(32, *cp0_0_index))
+         else if src == 0b00001 && sel == 0b000 then
+            (* RANDOM *)
+            fail (* notyet *)
+         else if src == 0b00010 && sel == 0b000 then
+            (* ENTRYLO *)
+            (bv_to_len(32, *cp0_2_ppage) << 0x0000000c (*12*)) |
+                (bv_to_len(32, *cp0_2_d) << 0x00000002 (*2*)) |
+          (bv_to_len(32, *cp0_2_v) << 0x00000001 (*1*)) |
+                (bv_to_len(32, *cp0_2_g))
+         else if src == 0b00100 && sel == 0b000 then
+            (* CONTEXT *)
+            (bv_to_len(32, *cp0_4_base) << 0x00000017 (*23*)) |
+                (bv_to_len(32, *cp0_4_badvaddr) << 0x00000004 (*4*))
+         else if src == 0b01000 && sel == 0b000 then
+            (* BADVADDR *)
+            *cp0_8_badvaddr
+         else if src == 0b01001 && sel == 0b000 then
+            (* COUNT *)
+            fail (* notyet *)
+         else if src == 0b01010 && sel == 0b000 then
+            (* ENTRYHI *)
+            (bv_to_len(32, *cp0_10_vpage) << 0x0000000c (*12*)) |
+               (bv_to_len(32, *cp0_10_asid))
+         else if src == 0b01011 && sel == 0b000 then
+            (* COMPARE *)
+            *cp0_11_compare
+         else if src == 0b01100 && sel == 0b000 then
+            (* STATUS *)
+            (bv_to_len(32, *cp0_12_ce) << 0x0000001c (*28*)) |
+                (bv_to_len(32, *cp0_12_rp) << 0x0000001b (*27*)) |
+                (bv_to_len(32, *cp0_12_fr) << 0x0000001a (*26*)) |
+                (bv_to_len(32, *cp0_12_re) << 0x00000019 (*25*)) |
+                (bv_to_len(32, *cp0_12_mx) << 0x00000018 (*24*)) |
+                (bv_to_len(32, *cp0_12_px) << 0x00000017 (*23*)) |
+                (bv_to_len(32, *cp0_12_bev) << 0x00000016 (*22*)) |
+                (bv_to_len(32, *cp0_12_ts) << 0x00000015 (*21*)) |
+                (bv_to_len(32, *cp0_12_sr) << 0x00000014 (*20*)) |
+                (bv_to_len(32, *cp0_12_nmi) << 0x00000013 (*19*)) |
+                (bv_to_len(32, *cp0_12_mask) << 0x00000008 (*8*)) |
+                (bv_to_len(32, *cp0_12_kx) << 0x00000007 (*7*)) |
+                (bv_to_len(32, *cp0_12_sx) << 0x00000006 (*6*)) |
+                (bv_to_len(32, *cp0_12_ux) << 0x00000005 (*5*)) |
+                (bv_to_len(32, *cp0_12_ksu) << 0x00000003 (*3*)) |
+                (bv_to_len(32, *cp0_12_erl) << 0x00000002 (*2*)) |
+                (bv_to_len(32, *cp0_12_exl) << 0x00000001 (*1*)) |
+                (bv_to_len(32, *cp0_12_ie))
+         else if src == 0b01101 && sel == 0b000 then
+            (* CAUSE *)
+            (bv_to_len(32, *cp0_13_bd) << 0x0000001f (*31*)) |
+                (bv_to_len(32, *cp0_13_ce) << 0x0000001c (*28*)) |
+                (bv_to_len(32, *cp0_13_iv) << 0x00000017 (*23*)) |
+                (bv_to_len(32, *cp0_13_wp) << 0x00000016 (*22*)) |
+                (bv_to_len(32, *cp0_13_pending) << 0x00000008 (*8*)) |
+                (bv_to_len(32, *cp0_13_code) << 0x00000002 (*2*))
+         else if src == 0b01110 && sel == 0b000 then
+            (* EPC *)
+            *cp0_14_epc
+         else if src == 0b01111 && sel == 0b000 then
+            (* PRID *)
+            (bv_to_len(32, *cp0_15_options) << 0x00000018 (*24*)) |
+                (bv_to_len(32, *cp0_15_vendor) << 0x00000010 (*16*)) |
+                (bv_to_len(32, *cp0_15_model) << 0x00000008 (*8*)) |
+                (bv_to_len(32, *cp0_15_revision))
+         else if src == 0b10000 && sel == 0b000 then
+            (* CONFIG *)
+            (bv_to_len(32, *cp0_16_m) << 0x0000001f (*31*)) |
+                (bv_to_len(32, *cp0_16_be) << 0x0000000f (*15*)) |
+                (bv_to_len(32, *cp0_16_at) << 0x0000000d (*13*)) |
+                (bv_to_len(32, *cp0_16_ar) << 0x0000000a (*10*)) |
+                (bv_to_len(32, *cp0_16_mt) << 0x00000007 (*7*)) |
+                (bv_to_len(32, *cp0_16_k0))
+         else if src == 0b10000 && sel == 0b001 then
+            (* CONFIG1 *)
+            (bv_to_len(32, *cp0_16_1_m) << 0x0000001f (*31*)) |
+                (bv_to_len(32, *cp0_16_1_tlbsize) << 0x00000019 (*25*)) |
+                (bv_to_len(32, *cp0_16_1_is) << 0x00000016 (*22*)) |
+                (bv_to_len(32, *cp0_16_1_il) << 0x00000013 (*19*)) |
+                (bv_to_len(32, *cp0_16_1_ia) << 0x00000010 (*16*)) |
+                (bv_to_len(32, *cp0_16_1_ds) << 0x0000000d (*13*)) |
+                (bv_to_len(32, *cp0_16_1_dl) << 0x0000000a (*10*)) |
+                (bv_to_len(32, *cp0_16_1_da) << 0x00000007 (*7*)) |
+                (bv_to_len(32, *cp0_16_1_c2) << 0x00000006 (*6*)) |
+                (bv_to_len(32, *cp0_16_1_md) << 0x00000005 (*5*)) |
+                (bv_to_len(32, *cp0_16_1_pc) << 0x00000004 (*4*)) |
+                (bv_to_len(32, *cp0_16_1_wr) << 0x00000003 (*3*)) |
+                (bv_to_len(32, *cp0_16_1_ca) << 0x00000002 (*2*)) |
+                (bv_to_len(32, *cp0_16_1_ep) << 0x00000001 (*1*)) |
+                (bv_to_len(32, *cp0_16_1_fp))
+         else if src == 0b10000 && sel == 0b010 then
+            (* CONFIG2 *)
+            (bv_to_len(32, *cp0_16_2_m) << 0x0000001f (*31*)) |
+                (bv_to_len(32, *cp0_tbs))
+         else if src == 0b10000 && sel == 0b011 then
+            (* CONFIG3 *)
+            (bv_to_len(32, *cp0_16_3_m) << 0x0000001f (*31*)) |
+                (bv_to_len(32, *cp0_sm) << 0x00000001 (*1*)) |
+                (bv_to_len(32, *cp0_tl))
+         else if src == 0b10001 && sel == 0b000 then
+            (* LLADDR *)
+            *cp0_17_lladdr
+         else
+            (* wrong *)
+            fail
+      in
+      *dst <- result
+   ]
+}

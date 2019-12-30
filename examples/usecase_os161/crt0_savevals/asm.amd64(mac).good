@@ -1,0 +1,2 @@
+mov %rbx, [lbl_argv]
+mov %rcx, [lbl_environ]

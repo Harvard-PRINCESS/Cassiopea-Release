@@ -1,0 +1,4 @@
+(extern lbl_argv)
+(extern lbl_environ)
+(MOVaddr_lbl_reg lbl_argv RBX)
+(MOVaddr_lbl_reg lbl_environ RCX)

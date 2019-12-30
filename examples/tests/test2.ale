@@ -1,0 +1,22 @@
+require type word
+require type register
+require value dispreg : register
+require value resultreg : register
+require value zero : word
+require function get_cont : (register) word
+require function get_memcont : (register) word
+provide type reg_word = word
+provide value dispcont : word = *dispreg
+provide function check_zero (v : word) : bool = v == zero
+block prog_ptr {
+	region M1: word bit 4 len word ref
+	region M2: word bit 4 len word ref
+	accesses: dispreg
+	modifies: resultreg
+	let disp: ptr = get_memcont(dispreg)
+	let cont: vec = get_cont(dispreg)
+  pre: 
+		true
+  post:
+    cont == get_cont(resultreg)
+}

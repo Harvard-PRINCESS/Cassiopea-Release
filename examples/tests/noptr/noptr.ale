@@ -1,0 +1,14 @@
+require type word
+require value dispreg : reg
+require value resultreg : reg
+require function addone: (word) word 
+
+block prog_noptr {
+	access: dispreg
+	modify: resultreg
+	let disp: vec = *dispreg
+	let cont: vec = addone(disp)
+	pre: true
+	post: ( cont == *resultreg )
+}
+

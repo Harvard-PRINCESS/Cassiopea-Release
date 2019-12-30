@@ -1,0 +1,5 @@
+Command: Verify prog synth-mips.prog against spec spec-mips.spec output to verify-synth-mips.out; log to verify-synth-mips.log
+Output to: verify-synth-mips.out
+Log to: verify-synth-mips.log
+Verification succeeded!
+	Execution Time: 0.103868s

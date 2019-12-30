@@ -1,0 +1,4 @@
+switch_save:
+
+This saves the old stack pointer via the first argument of
+switchframe_switch.

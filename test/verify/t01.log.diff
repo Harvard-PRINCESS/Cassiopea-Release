@@ -1,0 +1,9 @@
+--- t01.log.good	2019-12-16 13:59:49.422495993 -0800
++++ t01.log	2019-12-30 10:21:56.264694872 -0800
+@@ -1,3 +1,5 @@
+-Command: Verify prog t01.prog against spec t01.spec and output to t01.out, log to t01.log.raw
++Command: Verify prog t01.prog against spec t01.spec output to t01.out; log to t01.log.raw
++Output to: t01.out
++Log to: t01.log.raw
+ Verification succeeded!
+ 	Execution Time: ???s

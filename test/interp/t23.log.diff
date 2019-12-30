@@ -1,0 +1,16 @@
+--- t23.log.good	2019-12-16 13:59:49.414496083 -0800
++++ t23.log	2019-12-16 14:12:09.769932086 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t23.prog with start state t23.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t23.prog with start state t23.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -247,4 +249,4 @@
+ wt: 
+ rd: CPSR R3
+ wt: R3
+-	Execution Time: 0.018318s
++	Execution Time: 0.018406s

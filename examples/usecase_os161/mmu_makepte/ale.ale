@@ -1,0 +1,40 @@
+require value wordsize: int
+require value has_exec_perms: bool
+
+require value reg_arg_paddr: wordsize reg
+require value reg_arg_writable: wordsize reg
+require value reg_arg_executable: wordsize reg
+require value reg_arg_global: wordsize reg
+require value reg_result: wordsize reg
+
+require function page_aligned: (wordsize vec) bool
+
+require function pte_paddr: (wordsize vec) wordsize vec
+require function pte_writable: (wordsize vec) bool
+require function pte_executable: (wordsize vec) bool
+require function pte_global: (wordsize vec) bool
+require function pte_valid: (wordsize vec) bool
+require function pte_wellformed: (wordsize vec) bool
+
+block mmu_makepte {
+   let paddr: wordsize vec = *reg_arg_paddr
+   let writable: wordsize vec = *reg_arg_writable
+   let executable: wordsize vec = *reg_arg_executable
+   let global: wordsize vec = *reg_arg_global
+
+   pre:
+      page_aligned(paddr) &&
+      (writable == (0: wordsize vec) || writable == (1: wordsize vec)) &&
+      (executable == (0: wordsize vec) || executable == (1: wordsize vec)) &&
+      (global == (0: wordsize vec) || global == (1: wordsize vec))
+   post:
+      let pte: wordsize vec = *reg_result in
+      pte_paddr(pte) == paddr &&
+      pte_writable(pte) == (writable != (0: wordsize vec)) &&
+      (* not all MMUs support execute permission *)
+      (!has_exec_perms ||
+         pte_executable(pte) == (executable != (0: wordsize vec))) &&
+      pte_global(pte) == (global != (0: wordsize vec)) &&
+      pte_valid(pte) &&
+      pte_wellformed(pte)
+}

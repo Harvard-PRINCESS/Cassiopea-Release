@@ -1,0 +1,133 @@
+
+module cpu_irqoff {
+   (*
+    * XXX this doesn't work because we need *SF == 0b1 (supervisor mode)
+    * as a premise and it's not insertable anywhere
+    *)
+   def interrupts_are_on -> bool = *IRQ != 0b111
+   reg-modify: XF NF ZF VF CF
+}
+
+module initregs {
+   def crt0_additional_initialization -> bool = true
+   let crt0_argc_reg: reg = D0
+   let crt0_argv_reg: reg = A0
+   let crt0_environ_reg: reg = A1
+   reg-modify: XF NF ZF VF CF
+}
+
+module savevals {
+   def readlbl l: 32 label -> word = fetch[l, 32]
+   let crt0_argv_reg: reg = A0
+   let crt0_environ_reg: reg = A1
+   reg-modify: XF NF ZF VF CF
+}
+
+module setjmp_ret {
+   let reg_retval: reg = D0
+   reg-modify: XF NF ZF VF CF
+}
+
+module longjmp_ret {
+   let reg_arg_retval: reg = D0
+   let reg_retval: reg = D0
+   reg-modify: XF NF ZF VF CF
+}
+
+module setjmp_full {
+   let reg_arg_buf: reg = A0
+   let reg_retval: reg = D0
+   (*let JB_LEN: int = 11*)
+   let JB_LEN: int = 3
+
+   letstate argblock: 32 bit 2 len 32 ref memory
+   (*
+    * XXX ought to add:
+    *   pre: *reg_arg_buf = fetch[[argblock, 4], 32]
+    * but can't
+    *)
+
+   let pre_ra: 32 bit = fetch [[argblock, 0], 32]
+   let pre_A7: 32 bit = *A7
+   let pre_D3: 32 bit = *D3
+   (* skip currently disabled registers *)
+(*
+   let pre_A3: 32 bit = *A3
+   let pre_A4: 32 bit = *A4
+   let pre_A5: 32 bit = *A5
+   let pre_A6: 32 bit = *A6
+   let pre_D4: 32 bit = *D4
+   let pre_D5: 32 bit = *D5
+   let pre_D6: 32 bit = *D6
+   let pre_D7: 32 bit = *D7
+*)
+   def jmp_bufsaved (bufptr: word) -> bool =
+      fetch [bufptr b+ 0x00000000, 32] == pre_ra &&
+      fetch [bufptr b+ 0x00000004, 32] == pre_A7 &&
+      fetch [bufptr b+ 0x00000008, 32] == pre_D3
+(* &&
+      fetch [bufptr b+ 0x0000000c, 32] == pre_A3 &&
+      fetch [bufptr b+ 0x00000010, 32] == pre_A4 &&
+      fetch [bufptr b+ 0x00000014, 32] == pre_A5 &&
+      fetch [bufptr b+ 0x00000018, 32] == pre_A6 &&
+      fetch [bufptr b+ 0x0000001c, 32] == pre_D4 &&
+      fetch [bufptr b+ 0x00000020, 32] == pre_D5 &&
+      fetch [bufptr b+ 0x00000024, 32] == pre_D6 &&
+      fetch [bufptr b+ 0x00000028, 32] == pre_D7
+*)
+   reg-modify: XF NF ZF VF CF
+}
+
+module longjmp_full {
+   let reg_arg_buf: reg = A0
+   let reg_arg_retval: reg = D0
+   let reg_retval: reg = r2
+   (*let JB_LEN: int = 11*)
+   let JB_LEN: int = 3
+
+   letstate argblock: 32 bit 3 len 32 ref memory
+   (*
+    * XXX ought to add:
+    *   pre: *reg_arg_buf = fetch[[argblock, 4], 32]
+    *   pre: *reg_arg_retval = fetch[[argblock, 8], 32]
+    * but can't
+    *)
+
+   let pre_ra: 32 bit = fetch [bufptr b+ 0x00000000, 32]
+   let pre_A7: 32 bit = fetch [bufptr b+ 0x00000004, 32]
+   let pre_D3: 32 bit = fetch [bufptr b+ 0x00000008, 32]
+   (* skip currently disabled registers *)
+(*
+   let pre_A3: 32 bit = fetch [bufptr b+ 0x0000000c, 32]
+   let pre_A4: 32 bit = fetch [bufptr b+ 0x00000010, 32]
+   let pre_A5: 32 bit = fetch [bufptr b+ 0x00000014, 32]
+   let pre_A6: 32 bit = fetch [bufptr b+ 0x00000018, 32]
+   let pre_D4: 32 bit = fetch [bufptr b+ 0x0000001c, 32]
+   let pre_D5: 32 bit = fetch [bufptr b+ 0x00000020, 32]
+   let pre_D6: 32 bit = fetch [bufptr b+ 0x00000024, 32]
+   let pre_D7: 32 bit = fetch [bufptr b+ 0x00000028, 32]
+*)
+   def jmp_bufloaded -> bool =
+      fetch [[argblock, 0], 32] == pre_ra &&
+      *A7 == pre_A7 &&
+      *D3 == pre_D3
+(* &&
+      *A3 == pre_A3 &&
+      *A4 == pre_A4 &&
+      *A5 == pre_A5 &&
+      *A6 == pre_A6 &&
+      *D4 == pre_D4 &&
+      *D5 == pre_D5 &&
+      *D6 == pre_D6 &&
+      *D7 == pre_D7
+*)
+   reg-modify: XF NF ZF VF CF
+}
+
+module syscalls_loadnum {
+   let syscall_callnum_reg: reg = D0
+   let callnum: word = 0x00000010
+   reg-modify: XF NF ZF VF CF
+}
+
+

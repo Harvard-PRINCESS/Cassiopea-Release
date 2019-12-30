@@ -1,0 +1,7 @@
+bind b : ghost_bool
+block prog_disp_is_disabled1 {
+  pre: is_null(dispreg) && disabled_or_not(dispreg) && (b = is_disabled(dispreg)) (* dispatcher address stand-in *)
+  post:
+    (~ b || loaded_disabled(true)) &&
+    (b || loaded_disabled(false))
+}

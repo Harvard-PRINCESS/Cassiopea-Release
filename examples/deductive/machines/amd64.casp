@@ -1,0 +1,250 @@
+(*https://www.felixcloutier.com/x86/*)
+(*https://en.wikibooks.org/wiki/X86_Assembly/X86_Architecture*)
+
+let wordsize: int = 64
+type word = 64 bit
+type hword = 32 bit
+type halfword = 16 bit
+type byte = 8 bit
+type flg = 1 bit loc
+(* type register = word32 loc *)
+type halfregister = halfword loc
+type register = word loc
+
+(*general-purpose registers*)
+letstate RAX: register (*accumulator*)
+letstate RBX: register (*base*)
+letstate RCX: register (*counter*)
+letstate RDX: register (*data*)
+letstate RSP: register (*stack pointer*)
+letstate RBP: register (*stack base pointer*)
+letstate RSI: register (*source*)
+letstate RDI: register (*destination*)
+(* letstate RFLAGS: doubleregister (*flags*) *)
+letstate C: flg (* RFLAGS[0] *)
+letstate Z: flg (* RFLAGS[6] *)
+letstate S: flg (* RFLAGS[7] *)
+letstate O: flg (* RFLAGS[11] *)
+
+let wordzero : word = 0x0000000000000000
+let wordone : word = 0x0000000000000001
+
+let RAX.txt = "%rax"
+let RBX.txt = "%rbx"
+let RCX.txt = "%rcx"
+let RDX.txt = "%rdx"
+let RSP.txt = "%rsp"
+let RBP.txt = "%rbp"
+let RSI.txt = "%rsi"
+let RDI.txt = "%rdi"
+(* letstate M: 64 bit 4 len 64 ref memory *)
+
+def read_simm32 (imm: hword) -> word =
+	let tmp: word = bv_to_len(64, imm) in
+    if (imm & 0x80000000) != 0x00000000 then
+       tmp | 0xFFFFFFFF00000000
+    else tmp
+
+(******* Basic Instructions *******)
+defop ADD_imm Rd: register Imm: word {
+	txt = format("add $$0x$1, $2", Imm.hex, Rd.txt),
+	(* txt = "add" ++ Imm.txt ++ "," ++ Rd.txt, (*ADD $Imm, %Rd*) *)
+	sem = [ *Rd <- ( *Rd b+ Imm)
+		(*update flags: should be done, but currently we ignore it*)
+	]
+}
+
+(******* CMP Instructions *******)
+defop CMP_reg_reg Rn: register Rm: register {
+	txt = format("cmp $1, $2", Rn.txt, Rm.txt),
+	sem = [
+		let out : word = *Rn b- *Rm in
+		let iszero: bool = out == 0x0000000000000000 in
+		let isneg: bool = out[63] in
+		let isborrow: bool = *Rn b< *Rm in
+
+		(*update RFLAGS, only CF, ZF done; AF, PF, OF, SF ignored*)
+		*C <- isborrow? 0b1 : 0b0;
+		*Z <- iszero? 0b1 : 0b0
+	]
+}
+
+defop CMP_reg_imm Rn: register Imm: hword {
+	txt = format("cmp $1, $$0x$2", Rn.txt, Imm.hex),
+	sem = [
+		let sign_extended: word = read_simm32(Imm) in
+		let out : word = *Rn b- sign_extended in
+		let iszero: bool = out == 0x0000000000000000 in
+		let isneg: bool = out[63] in
+		let isborrow: bool = *Rn b< sign_extended in
+
+		(*update RFLAGS, only CF, ZF done; AF, PF, OF, SF ignored*)
+		*C <- isborrow? 0b1 : 0b0;
+		*Z <- iszero? 0b1 : 0b0
+	]
+}
+defop CMPL_imm_imm_reg Rd: register Imm: hword Off: int {
+	txt = format("cmpl $$0x$1, $2($3)", Imm.dec, Off.dec, Rd.txt),
+	(* txt = "cmpl" ++ Imm.txt ++ "," ++ Off.txt ++ "(" ++ Rd.txt ++ ")", (*CMPL $Imm, Off(%Rd)*) *)
+	sem = [
+		let dRd: word = *Rd in
+		let Imm_dw: word = bv_to_len(64, Imm) in
+		let Off_dw: word = uint_to_bv_l(64, Off) in
+		let dRd_sh: word = dRd b+ Off_dw in 
+		(* let dRd_word: word = bv_to_len(32, dRd) in
+		let dRd_int: int = bv_to_uint(dRd_word) in
+		let Imm_int: int = bv_to_uint(Imm) in
+		let dRd_sh: int = dRd_int + Off in
+		let dRd_sh_dw: doubleword = uint_to_bv_l(64, dRd_sh) in *)
+
+		let cont: word = fetch[dRd_sh, 64] in
+		(* let cont_int: int = bv_to_uint(cont) in
+		let out_int: int = cont_int - Imm_int in *)		
+		let out: word = cont b- Imm_dw in
+
+		(* let iszero: bool = out_int == 0 in *)
+		let iszero: bool = out == 0x0000000000000000 in
+		let isneg: bool = out[63] in
+		let isborrow: bool = cont b< Imm_dw in
+
+		(*update RFLAGS, only CF, ZF done; AF, PF, OF, SF ignored*)
+		*C <- isborrow? 0b1 : 0b0;
+		*Z <- iszero? 0b1 : 0b0
+	]
+}
+
+defop CMP_imm_reg_reg Rd: register Rs: register Off: int {
+	txt = format("cmp $1($2), $3", Off.dec, Rs.txt, Rd.txt),
+	(* txt =  "cmp" ++ Off.txt ++ "(" ++ Rs.txt ++ ")" ++ "," ++ Rd.txt, (*CMP Off(%Rs), %Rd*) *)
+	sem = [
+		let dRd: word = *Rd in
+		let dRs: word = *Rs in
+		let Off_dw: word = uint_to_bv_l(64, Off) in
+		let dRs_sh: word = dRs b+ Off_dw in
+		(* let dRd_int: int = bv_to_uint(dRd) in
+		let dRs_int: int = bv_to_uint(dRs) in
+		let dRs_sh: int = dRs_int + Off in
+		let dRs_sh_dw: doubleword = uint_to_bv_l(64, dRs_sh) in *)
+
+		let cont: word = fetch[dRs_sh, 64] in
+		(* let cont_int: int = bv_to_uint(cont) in
+		let out_int: int = dRd_int - cont_int in *)
+		let out: word = dRd b- cont in
+
+		(* let iszero: bool = out_int == 0 in *)
+		let iszero: bool = out == 0x0000000000000000 in
+		let isneg: bool = out[63] in
+		let isborrow: bool = dRd b< cont in
+
+		(*update RFLAGS, only CF, ZF done; AF, PF, OF, SF ignored*)
+		*C <- isborrow? 0b1 : 0b0;
+		*Z <- iszero? 0b1 : 0b0
+	]
+}
+
+(******* MOV Instructions *******)
+(*https://www.felixcloutier.com/x86/MOV.html*)
+defop MOVpure_reg_reg Rd: register Rs: register {
+	txt = format("mov $1, $2", Rs.txt, Rd.txt),
+	sem = [ *Rd <- *Rs ]
+}
+
+defop MOVpure_reg_imm Rd: register Imm: word {
+	txt = format("mov $$0x$1, $2", Imm.hex, Rd.txt),
+	sem = [ *Rd <- Imm ]
+}
+
+defop MOVpure_reg_lbl Rd: register Lbl: 64 label {
+	txt = format("mov $1, $2", Lbl.lbl, Rd.txt),
+	sem = [ *Rd <- Lbl ]
+}
+
+defop MOVpure_reg_off Rd: register Rs: register Off: int {
+	txt = format("mov $1($2), $3", Off.dec, Rs.txt, Rd.txt),
+	sem = [
+		let Off_dw: word = uint_to_bv_l(64, Off) in
+		let cont: word = *Rs b+ Off_dw in
+		*Rd <- cont
+	]
+}
+
+defop MOVaddr_reg_reg Rd: register Rs: register {
+	txt = format("mov [$1], $2", Rs.txt, Rd.txt),
+	(* txt = "mov" ++ Rs.txt ++ "," ++ Rd.txt, (* MOV %Rs, %Rd*) *)
+	sem = [ let cont: word = fetch[ *Rs, 64] in *Rd <- cont ]
+}
+
+defop MOVaddr_reg_off Rd: register Rs: register Off: int {
+	txt = format("mov [$1($2)], $3", Off.dec, Rs.txt, Rd.txt),
+	(* txt = "mov" ++ Off.txt ++ "(" ++ Rs.txt ++ ")" ++ "," ++ Rd.txt, (*MOV Off(%Rs), %Rd*) *)
+	sem = [
+		let Off_dw: word = uint_to_bv_l(64, Off) in
+		let addr: word = *Rs b+ Off_dw in
+		let cont: word = fetch[addr, 64] in
+		*Rd <- cont
+	]
+}
+
+defop MOVaddr_reg_lbl Rd: register Lbl: 64 label {
+	txt = format("mov [$1], $2", Lbl.lbl, Rd.txt),
+	sem = [ *Rd <- fetch[Lbl, 64] ]
+}
+
+defop MOVaddr_lbl_reg Lbl: 64 label Rs: register {
+	txt = format("mov $1, [$2]", Rs.txt, Lbl.lbl),
+	sem = [ store[Lbl, 64] <- *Rs ]
+}
+
+defop CMOVZ_reg Rd: register Rs: register {
+	txt = format("cmovz $1, $2", Rs.txt, Rd.txt),
+	sem = [
+		let zf_zero: bool = *Z == 0b1 in
+		if zf_zero then *Rd <- *Rs else skip
+	]
+}
+
+defop CMOVNZ_reg Rd: register Rs: register {
+	txt = format("cmovnz $1, $2", Rs.txt, Rd.txt),
+	sem = [
+		let zf_zero: bool = *Z == 0b0 in
+		if zf_zero then *Rd <- *Rs else skip
+	]	
+}
+
+(******* Data Transfer Instructions *******)
+(*https://www.felixcloutier.com/x86/PUSH.html*)
+defop PUSH_reg Rn: register {
+	txt = format("push $1", Rn.txt),
+	(* txt = "push" ++ Rn.txt, (* PUSH %Rn*) *)
+	sem = [
+		let dRn: word = *Rn in 
+		let dRSP: word = *RSP in
+		let dRSP8: word = dRSP b- 0x0000000000000008 in
+		store[dRSP8, 64] <- dRn;
+		*RSP <- dRSP8
+	]
+}
+
+(*https://www.felixcloutier.com/x86/POP.html*)
+defop POP_reg Rn: register {
+	txt = format("pop $1", Rn.txt),
+	(* txt = "pop" ++ Rn.txt, (*POP %Rn*) *)
+	sem = [
+		let dRSP: word = *RSP in
+		let cont_RSP: word = fetch[dRSP, 64] in
+		let dRSP8: word = dRSP b+ 0x0000000000000008 in
+		*RSP <- dRSP8;
+		*Rn <- cont_RSP
+	]
+}
+
+defop LEA_imm_reg_reg Rd: register Rs: register Off:int {
+	txt = format("lea 0x$1($2), $3", Off.hex, Rs.txt, Rd.txt),
+	(* txt = "lea" ++ Off.txt ++ "(" ++ Rs.txt ++ ")" ++ "," ++ Rd.txt, (*LEA Off(%Rs), %Rd*) *)
+	sem = [
+		let dRs: word = *Rs in
+		let Off_dw: word = uint_to_bv_l(64, Off) in
+		let res: word = dRs b+ Off_dw in
+		*Rd <- res
+	]
+}

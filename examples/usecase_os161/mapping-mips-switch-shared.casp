@@ -1,0 +1,7 @@
+(* shared among all four of the switch blocks *)
+let switchframesize: 32 bit = 0x0000002c (* 44; 40 for OS/161 *)
+let stackptr: 32 bit loc = r29
+let stacksgrowup: bool = false
+let oldframe_arg_reg: 32 bit loc = r4
+let newframe_arg_reg: 32 bit loc = r5
+let switchframecount: int = 11 (* 44/sizeof word *)

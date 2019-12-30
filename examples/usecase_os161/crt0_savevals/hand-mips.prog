@@ -1,0 +1,4 @@
+(extern lbl_argv)
+(extern lbl_environ)
+(SW_lbl r2 lbl_argv)
+(SW_lbl r3 lbl_environ)

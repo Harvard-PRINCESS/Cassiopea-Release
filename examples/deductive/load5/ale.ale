@@ -1,0 +1,26 @@
+require type wordsize
+require type register
+
+require value reg1: register
+require value reg2: register
+require value reg3: register
+require value reg4: register
+require value reg5: register
+
+require value base: word
+require value v1: word
+require value v2: word
+require value v3: word
+require value v4: word
+require value v5: word
+
+block load5 {
+  pre:
+    *reg1 == base
+  post:
+    *reg1 == v1 &&
+    *reg2 == v2 &&
+    *reg3 == v3 &&
+    *reg4 == v4 &&
+    *reg5 == v5
+}

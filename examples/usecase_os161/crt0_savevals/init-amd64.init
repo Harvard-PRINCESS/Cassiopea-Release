@@ -1,0 +1,3 @@
+(memory mem_argv: 64 bit 1 len 64 ref with lbl_argv)
+(memory mem_environ: 64 bit 1 len 64 ref with lbl_environ)
+(RBX = 0xffffffffffffffff)

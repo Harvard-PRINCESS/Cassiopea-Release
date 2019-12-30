@@ -1,0 +1,46 @@
+require value wordsize: int
+require value switchframecount: int
+require value switchframesize: int
+require value stackptr: wordsize reg
+require value stacksgrowup: bool
+require value newframe_arg_reg: wordsize reg
+require value oldframe_arg_reg: wordsize reg
+
+require function switchframe_saved: (wordsize ptr) bool
+require function switchframe_loaded: (wordsize ptr) bool
+
+block switch_all {
+   region oldslotmem: wordsize bit 1 len wordsize ref
+   region newslotmem: wordsize bit 1 len wordsize ref
+
+   region oldframe: wordsize bit switchframecount len wordsize ref
+   region newframe: wordsize bit switchframecount len wordsize ref
+
+   let oldslotptr: wordsize ptr = [oldslotmem, 0]
+   let newslotptr: wordsize ptr = [newslotmem, 0]
+
+   let oldsp_empty: word = *stackptr
+   let oldsp_full: word =
+      (if stacksgrowup then oldsp_empty + switchframesize
+       else oldsp_empty - switchframesize)
+   let oldframe_base: word =
+      (if stacksgrowup then oldsp_empty else oldsp_empty - switchframesize)
+
+   let newsp_full: word = read[newslotptr]
+   let newsp_empty: word =
+      (if stacksgrowup then newsp_full - switchframesize
+       else newsp_full + switchframesize) 
+   let newframe_base: word =
+      (if stacksgrowup then newsp_full - switchframesize else newsp_full)
+
+   pre:
+      *oldframe_arg_reg == oldslotptr &&
+      *newframe_arg_reg == newslotptr &&
+      oldframe_base == [oldframe, 0] &&
+      newframe_base == [newframe, 0]
+   post:
+      read[oldslotptr] == oldsp_full &&
+      *stackptr == newsp_empty &&
+      switchframe_saved() &&
+      switchframe_loaded()
+}

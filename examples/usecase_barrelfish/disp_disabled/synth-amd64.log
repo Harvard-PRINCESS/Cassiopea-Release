@@ -1,0 +1,20 @@
+Command: Synthesize for spec spec-amd64.spec output to synth-amd64.prog; log to synth-amd64.log
+Output to: synth-amd64.prog
+Log to: synth-amd64.log
+Synthesis with 0 insts starting
+Found dependencies in: 0.005389s
+Found value dependencies in: 0.000024s
+Iter 1 Guessing...	Guessing Time: 0.004480s
+Iter 1 Checking...	Checking Time: 0.081612s
+Iter 2 Guessing...	Guessing Time: 0.000328s
+Synthesis with 0 insts failed with 1 candidates, 1 counterexamples!
+Synthesis with 1 insts starting
+Found dependencies in: 0.005983s
+Found value dependencies in: 0.000693s
+Iter 1 Guessing...	Guessing Time: 0.004479s
+Iter 1 Checking...	Checking Time: 0.079016s
+Iter 2 Guessing...	Guessing Time: 0.037920s
+Iter 2 Checking...	Checking Time: 0.082209s
+Synthesis with 1 insts succeeded! Prog:
+(CMP_reg_reg RSI RSI)
+	Execution Time: 0.381836s

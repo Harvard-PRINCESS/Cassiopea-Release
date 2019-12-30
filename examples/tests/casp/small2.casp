@@ -1,0 +1,76 @@
+type word = 32 bit
+type halfword = 16 bit
+type doubleword = 64 bit
+type byte = 8 bit
+type register = word loc
+type doubleregister = doubleword loc
+type cond_field = 4 bit
+type rotate_imm4 = 4 bit
+type imm8 = 8 bit
+type imm12 = 12 bit
+type imm5 = 5 bit
+type flg = 1 bit loc
+
+(*CPSR current program status register*)
+(* letstate N: flg (* CPSR[31] *)
+letstate Z: flg (* CPSR[30] *)
+letstate C: flg (* CPSR[29] *)
+letstate V: flg (* CPSR[28] *) *)
+letstate R0: register  (* first function argument *)
+letstate R1: register  (* second function argument *)
+letstate R2: register  (* third function argument *)
+letstate R14: register  (* link register *)
+letstate M: 32 bit 4 len 32 ref memory
+
+let resultreg: register = R1
+let areareg: register = R0
+let dispreg: register = R2
+let pcreg: register = R14
+
+def get_cont r: register -> word = *r
+
+(* add1.ale *)
+def loaded_add1 biv: word -> bool = 
+	let dR1: word = *resultreg in
+		(dR1 == biv b+ 0x00000001)
+
+(* add2.ale *)
+def loaded_add2 biv: word -> bool = 
+	let dR1: word = *resultreg in
+	let dR0: word = *areareg in
+	(dR1 == biv b+ 0x00000001) && (dR0 == biv b+ 0x00000004)
+
+(* add3.ale *)
+def loaded_add3 biv: word -> bool = 
+	let dR1: word = *resultreg in
+	let dR2: word = *dispreg in
+	let dR0: word = *areareg in
+	let dR14: word = *pcreg in
+	(dR1 == biv b+ 0x00000001) && 
+	(dR0 == biv b+ 0x00000003) && 
+	(dR14 == biv b+ 0x00000005)
+	
+defop ADD_imm Rd: register Rn: register Imm: word {
+	txt = "ADD" ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Imm.txt,
+	sem = [
+			*Rd <- *Rn b+ Imm
+
+	]
+}
+
+defop SUB_imm Rd: register Rn: register Imm: word {
+	txt = "ADD" ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Imm.txt,
+	sem = [
+			*Rd <- *Rn b- Imm
+
+	]
+}
+
+(*word: register offset pre-indexed*)
+defop LDR_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "ldr" ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ "," ++ Rm.txt ++ "]", 
+	sem = [
+		let out: word = *Rn b+ *Rm in
+			*Rd <- read[out, 32]
+	]
+}

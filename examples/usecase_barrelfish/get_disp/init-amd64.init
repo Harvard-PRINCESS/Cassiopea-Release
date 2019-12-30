@@ -1,0 +1,5 @@
+(memory GOT: 64 bit 4 len 64 ref)
+(memory dcb: 64 bit 4 len 64 ref)
+([GOT, 0] = [dcb, 0])
+(RIP = [GOT, 0])
+([dcb, 2] = 0xffffabcdffffabcd)

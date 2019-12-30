@@ -1,0 +1,5 @@
+Command: Verify prog hand-arm32.prog against spec spec-arm32.spec output to verify-hand-arm32.out; log to verify-hand-arm32.log
+Output to: verify-hand-arm32.out
+Log to: verify-hand-arm32.log
+Verification succeeded!
+	Execution Time: 0.026323s

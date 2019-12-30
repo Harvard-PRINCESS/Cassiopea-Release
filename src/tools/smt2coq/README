@@ -1,0 +1,152 @@
+smt2coq turns smt into Coq .v files for analysis.
+
+It supports:
+ - smtlib syntax: smt2coq foo.smt > foo.v
+ - casp's expression dump syntax: smt2coq -c foo.dump > foo.v
+
+It does not handle penguin's dump format but it will probably gain
+that when I next need to debug penguin.
+
+The output .v file maps smt integers to Z and smt bitvectors to nat,
+and all logic to bool (not Prop).
+
+It has the following structure:
+   - imports
+   - axioms providing names for bitwise operations not available on nat
+     (slice, bitwise and / or)
+   - an ltac called "clean" that applies a range of boolean expression
+     simplifiers plus some other basic reductions that have proved useful
+   - an ltac called "logic" that rewrites boolean expressions equal to a
+     constant into Prop logic
+   - a Section called "Stuff" to hold the smt
+   - a Variable for each uninterpreted/unassigned value in the input
+   - a Definition called "stuff" that contains a let-binding for each of
+     the assigned values in the input plus all assertions anded together
+
+Some known gotchas:
+
+   - The casp expression dump syntax does not provide variable bindings,
+     so it declares every variable it finds in the expression based on
+     knowing the naming structure (bool_*, int_*, bv_*) to figure the
+     type; this means though that unreferenced variables disappear and
+     you may need to make adjustments if you paste in additional material.
+
+   - The type inference/checking was written for smtlib files and knows
+     which operators smtlib distinguishes for ints and bitvectors and which
+     it doesn't. The casp dump syntax is slightly different in this regard,
+     so you may see odd results if you feed in an ill-typed casp dump term.
+     (Of course, if you _got_ an ill-typed casp dump term something
+     else is wrong...)
+
+   - The let-bindings generated from smtlib assignments will generally
+     be unfolded immediately by Coq, which is not necessarily
+     desirable. Preventing this requires generating a different output
+     representation, and it's not clear yet what.
+
+   - The widths of bitvectors are not preserved, so (a) ill-typed
+     terms may be accepted and converted to incoherent output, and (b)
+     operations that rely on overflow/wrap semantics of bitvectors may
+     not simplify properly, and it may not be clear where this happens.
+
+   - Because bitvectors are translated to nat, large bitvector
+     constants are likely to cause problems. The latest Coq seems to
+     handle these better (as in, you can write such constants down
+     without it crashing, because it writes them as Uint.to_nat) but
+     this in turn makes a mess in the expressions. It is probably a
+     good idea if large bitvector constants turn up to create a
+     separate Definition for each one and then avoid unfolding those
+     definitions. This could be done automatically but hasn't been.
+
+   - Because bitvecotrs are translated to nat, some bitvector
+     operations are not natively available. These are stubbed out in
+     the output file as admitted definitions. If you need to reason
+     about them in more detail than equality you'll need to admit
+     assertions or lemmas about them. These could be included in the
+     output file, but haven't been.
+
+   - Because integers are translated to Z, working with integer
+     operations can be irritating, because for backend reasons I don't
+     understand omega fails on many simple statements in Z that it
+     handles readily in nat.
+
+   - Sufficiently large smt dumps will cause Coq to choke. So far this
+     has manifested as more-or-less-simple rewrite applications not
+     returning.
+
+
+Usage
+
+The premise is that if you get a large smt term that is wrong in some
+way (e.g. it is unsatisfiable and it's supposed to be satisfiable, or
+vice versa)... in order to find out/understand what's wrong with it,
+you generally need to simplify it, but you need to simplify it
+interactively and not transform too much at once, and when doing so
+you need to be able to relate the results to not necessarily the input
+smt expression but to the constructs that generated it.
+
+This can be done by hand, or in some cases even with string replace in
+a text editor, but for large expressions this is tedious,
+time-consuming, and error-prone, and making an error renders the whole
+exercise useless.
+
+Therefore, this tool allows loading the expressions into Coq and using
+Coq as an interactive rewrite engine. This has been quite effective
+over the past few months.
+
+Generally what you do is convert your smt to a .v file, load it into
+coqide or Proof General, write a lemma that states something about
+"stuff" (the converted term), do "unfold stuff" to see the actual
+term, and then simplify.
+
+If you want to substitute a model for part of the material in, write
+the the model assignments as equalities and make them premises of the
+lemma; then "unfold stuff; intros; subst" will do the substitution for
+you.
+
+Typical usages include:
+
+ - Checking whether two terms are equal: generate two .v files, unify
+the lists of Variables, move the "stuff" definition from into the
+other as "stuff2", then try to prove "stuff = stuff2". If the equality
+reduces somewhere to "false = true", they aren't equal. Don't use the
+f_equal tactic unless the terms are supposed to correspond
+structurally.
+
+ - Checking if a term is satisfiable: make "stuff = true" the goal,
+simplify as far as possible, then rewrite into Prop (the provided
+"logic" ltac does this), then do "repeat split" to separate all the
+top-level ands. Then look over the goals for necessary conditions and
+add them as premises to the lemma. To examine a single goal, use
+"Focus n". For large goals full of ors, use different combinations of
+"left" and "right" to look for promising alternatives.
+
+ - Or, make "stuff = false" the goal, use "split" and "left" and
+"right" as needed, and look for unprovable terms (e.g. "(x =? 3) =
+false" and use those to deduce necessary conditions.
+
+ - You can write a lemma of the form 
+      ... -> exists x1 x2, var1 = x1 -> var2 = x2 -> ...
+but this serves no purpose relative to adding premises and makes the
+proof goal substantially harder to work with; so I don't recommend it.
+
+ - If a term is satisfiable when it shouldn't be (or vice versa) set
+it to either true or false as seems more useful for dissecting it, and
+simplify it until it becomes apparent where something's wrong.
+
+
+Unimplemented features
+
+Some things that could be implemented but aren't include:
+
+ - handling penguin's dump format (as noted above);
+ - an output mode where each let-binding comes out instead as a
+   top-level definition -- though this would be much harder to work
+   with it will also scale to much larger smt inputs;
+ - an output mode where each let-binding comes out instread as a
+   forall binding and equality constraint;
+ - searching for common subexpressions and providing ltacs to
+   factor them out (doing the actual factoring automatically is almost
+   certainly a bad idea because it potentially destroys the
+   interactivity);
+ - output to an actual coq bitvector library;
+ - two items noted in the gotchas.

@@ -1,0 +1,15 @@
+// file: kernel/aarmv7/exception.S
+
+// Macro to initialize system mode stack.
+// Assumes that the GOT pointer is set.
+// PIC = r9
+
+ldr sp, cpu_stack_got_offset
+ldr sp, [PIC_REGISTER, sp]
+add sp, sp, #KERNEL_STACK_SIZE
+
+// Problem: cpu_stack_got_offset is a program label, 
+// but we can only do (Ptr + Vec) or (Vec + Vec)
+
+; cpu_stack_got_offset:
+    ; .word kernel_stack(GOT)

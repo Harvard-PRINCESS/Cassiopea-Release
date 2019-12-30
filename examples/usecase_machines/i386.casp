@@ -1,0 +1,36 @@
+(*
+ * x86 32 bit
+ * Architecture manual:
+ 		https://software.intel.com/sites/default/files/managed/39/c5/325462-sdm-vol-1-2abcd-3abcd.pdf
+ * Instruct Set manual:
+ 		https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-instruction-set-reference-manual-325383.pdf
+ 	website:
+ 		http://www.felixcloutier.com/x86/
+ 	flag setting:
+ 		https://www.cs.uaf.edu/2009/fall/cs301/lecture/12_07_flags.html
+ *)
+
+(* Currently, we support the following instructions:
+ *)
+
+type word = 32 bit
+type halfword = 16 bit
+type register = word loc
+
+(* This is in eflags register*)
+letstate CF:1 bit loc = 0x0 (* carry flag; bit 0 *)
+letstate PF:1 bit loc = 0x0 (* parity flag; bit 2 *)
+letstate AF:1 bit loc = 0x0 (* auxiliary carry flag; bit 4 *)
+letstate ZF:1 bit loc = 0x0 (* zero flag; bit 6 *)
+letstate SF:1 bit loc = 0x0 (* sign flag; bit 7*)
+letstate OF:1 bit loc = 0x0 (*overflow flag; bit 11*)
+
+(* all of the following are callee-saved *)
+letstate EAX:	register = 0x00000000  (* Accumulator for operands and results data *)
+letstate EBX:	register = 0x00000000  (* pointer to data in the DS segment *)
+letstate ECX:	register = 0x00000000  (* counter for string and loop operations *)
+letstate EDX:	register = 0x00000000  (* i/o pointer *)
+letstate ESI:	register = 0x00000000  (* pointer to data in the segment pointed to by DS register; source pointer for string ops *)
+letstate EDI:	register = 0x00000000  (* pointer to data in the segment pointed to by ES register; destination pointer for string ops *)
+letstate EBP:	register = 0x00000000  (* pointer to data on the stack *)
+letstate ESP:	register = 0x00000000  (* stack pointer *)

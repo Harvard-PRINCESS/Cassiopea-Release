@@ -1,0 +1,142 @@
+(*NOTE: TEST CODE DONE*)
+(*(SETREG R0 0x00000000)
+(SETREG R1 0x00000004)
+(SETREG R2 0x00000008)
+(SETREG R3 0x0000000c)
+(SETREG R4 0x00000010)
+(SETREG R5 0x00000014)
+(SETREG R6 0x00000018)
+(SETREG R7 0x0000001c)
+(SETREG R8 0x00000020)
+(SETREG R9 0x00000024)
+(SETREG R10 0x00000028)
+(SETREG R11 0x0000002c)
+(SETREG R12 0x00000030)
+(SETREG R13 0x00000034)
+(SETREG R14 0x00000038)
+(SETREG PC 0x0000003c)
+(SETREG R13_svc 0x00000040)
+(SETREG R14_svc 0x00000044)
+(SETREG CPSR 0x000000FE)
+(SETREG SPSR 0x000000FF)*)
+
+(*(STR_imm R3 R0 0x000 0b1110)*)
+(*(STR_imm R14 R0 0x040 0b1110)*)
+(ADD_imm R3 R0 0x0 0x14 0b1110)
+
+(* (STMIA_wtback_usr R3 11 0x7ff0) *)
+(*(STR_imm R4 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R5 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R6 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R7 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R8 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R9 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R10 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R11 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R12 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R13 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R14 R3 0x000 0b1110)*)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+
+(ADD_imm R3 R3 0x0 0x08 0b1110)
+
+(* (VSTMIA_wtback_64 R3 16 0x0000ffff) (VSTMIA_wtback_64 R3 16 0xffff0000) *)
+
+(ADD_imm R3 R0 0x0 0x10 0b1110)
+
+(* (POP 0xf0) *)
+(*(LDR_imm R4 R13 0x000 0b1110)*)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+(*(LDR_imm R5 R13 0x000 0b1110)*)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+(*(LDR_imm R6 R13 0x000 0b1110)*)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+(*(LDR_imm R7 R13 0x000 0b1110)*)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+
+(* (STMDA_wtback R3 4 0x00f0)*)
+(*(STR_imm R7 R3 0x000 0b1110)*)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R6 R3 0x000 0b1110)*)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R5 R3 0x000 0b1110)*)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+(*(STR_imm R4 R3 0x000 0b1110)*)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+
+(*
+ASM CODE:
+CPSR_REG = 0
+PC_REG = 16
+R3_REG = 4
+R4_REG = 5   
+save_context r0 r3
+.macro save_context context, spsr_reg
+	str     \spsr_reg, [\context, #(CPSR_REG * 4)]
+	str     lr, [\context, #(PC_REG * 4)]
+	add     \spsr_reg, \context, #(R4_REG * 4)
+	stmia   \spsr_reg!, {r4-r14}^
+	add     \spsr_reg, #8
+	vstmia  \spsr_reg!, {d0-d15}
+	vstmia  \spsr_reg!, {d16-d31}
+	add     \spsr_reg, \context, #(R3_REG * 4)
+	pop     {r4-r7}                         // Pop spilled scratch registers
+	stmda   \spsr_reg!, {r4-r7}             // And Save them
+.endm
+*)
+
+(*
+Memory:
+============
+0 : c
+4 : 30
+8 : 34
+c : 38
+10 : 38
+14 : 10
+18 : 14
+1c : 18
+20 : 1c
+24 : 20
+28 : 24
+2c : 28
+30 : 2c
+34 : 30
+38 : 34
+3c : 38
+40 : 38
+
+Registers:
+============
+CPSR : fe, len 32
+PC : 3c, len 32
+R0 : 0, len 32
+R1 : 4, len 32
+R10 : 28, len 32
+R11 : 2c, len 32
+R12 : 30, len 32
+R13 : 44, len 32
+R13_svc : 40, len 32
+R14 : 38, len 32
+R14_svc : 44, len 32
+R2 : 8, len 32
+R3 : 0, len 32
+R4 : 30, len 32
+R5 : 34, len 32
+R6 : 38, len 32
+R7 : 38, len 32
+R8 : 20, len 32
+R9 : 24, len 32
+SPSR : ff, len 32
+
+*)

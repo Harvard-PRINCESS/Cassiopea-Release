@@ -1,0 +1,4 @@
+Command: Interpret prog t32.prog with start state t32.init and output to <stdout>, log to <stdout>
+Fatal error: exception Failure("concrete execution failed at t32.casp:15,6-15,28 with error: store: got a bitvector address")
+Fatal error: exception Failure("concrete execution failed at t32.casp:15,6-15,28 with error: store: got a bitvector address")
+FAILED

@@ -1,0 +1,69 @@
+Minor alterations while transcribing
+------------------------------------
+
+ - the TR uses v, i, j, k for variables; I use x, y, z
+
+ - the TR's abstract syntax is halfway concrete; I've dropped those
+parts
+
+ - I've changed some of the detailed naming/spelling to my preferred
+naming schemes for various things (e.g. LOGAND, BITAND) because it's a
+lot easier for me this way.
+
+ - plain \phi (quantifier-free logic expressions) in the TR are just
+expressions and I haven't made a separate type for them.
+
+ - I don't understand the difference between the \Gamma and \Delta
+type environments (and it doesn't seem to lead anywhere) so I've
+folded them together. My best guess is that it was supposed to reflect
+the difference between "global" and non-"global" identifiers...
+	wrong: \Gamma is for mapping variables to types, \Delta for
+		type alias names. see complaint below about folding
+		them together.
+	XXX: we need both, fix it all.
+
+ - the N construct is only used for bit widths but it contains math
+integers (which are signed) in the TR. I've used nat.
+
+
+
+Elaborations while transcribing
+-------------------------------
+
+(these should probably stay out of the TR)
+
+[nil]
+
+
+
+More significant alterations/discrepancies
+------------------------------------------
+
+(these should probably be changed either here or there)
+
+ - The TR distinguishes "id" for "globals" from "v, i, j, k" for
+"vars"; I thought we had agreed to drop this distinction. I have done
+so in my stuff.
+
+
+
+Bugs in the TR
+--------------
+
+[nil]
+
+
+
+Questions
+---------
+
+ - Why is only t2 required to be well-formed in the first rule under
+subtyping? I guess because the rules are written so that you can't
+derive that expressions have ill-formed types?
+	Yes, that seems to be the idea.
+	The mechanization should prove that all types in the environment
+	are valid.
+
+ - why is there a HALT statement and isn't it going to make trouble?
+ah, it's for crashing. Can we rename it to CRASH?
+

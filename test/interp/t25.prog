@@ -1,0 +1,157 @@
+(*entry*)
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R3 R13 0x000 0b1110)
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R2 R13 0x000 0b1110)
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R1 R13 0x000 0b1110)
+(SUB_imm R13 R13 0x0 0x04 0b1110)
+(STR_imm R0 R13 0x000 0b1110)
+
+(MRS R3 SPSR 0b1110)
+(ANDS_imm R1 R3 0x0 0x0f 0b1110)
+
+(*save context*)
+(STR_imm R3 R0 0x000 0b1110)
+(STR_imm R14 R0 0x040 0b1110)
+(ADD_imm R3 R0 0x0 0x14 0b1110)
+
+(STR_imm R4 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R5 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R6 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R7 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R8 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R9 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R10 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R11 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R12 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R13 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R14 R3 0x000 0b1110)
+(ADD_imm R3 R3 0x0 0x04 0b1110)
+
+(ADD_imm R3 R3 0x0 0x08 0b1110)
+(ADD_imm R3 R0 0x0 0x10 0b1110)
+
+(LDR_imm R4 R13 0x000 0b1110)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+(LDR_imm R5 R13 0x000 0b1110)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+(LDR_imm R6 R13 0x000 0b1110)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+(LDR_imm R7 R13 0x000 0b1110)
+(ADD_imm R13 R13 0x0 0x04 0b1110)
+
+(STR_imm R7 R3 0x000 0b1110)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R6 R3 0x000 0b1110)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R5 R3 0x000 0b1110)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+(STR_imm R4 R3 0x000 0b1110)
+(SUB_imm R3 R3 0x0 0x04 0b1110)
+
+
+(*resume context*)
+(MSR_CPSR_c 0xd3 0b1110)
+
+(LDR_imm R14_svc R0 0x000 0b1110)
+(ADD_imm R0 R0 0x0 0x04 0b1110)
+(MSR_reg SPSR R14_svc 0b1110)
+
+(MOV_reg R14_svc R0 0b1110)
+(LDR_imm R0 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R1 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R2 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R3 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R4 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R5 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R6 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R7 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R8 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R9 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R10 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R11 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R12 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+
+(ADD_imm R14_svc R14_svc 0x0 0x14 0b1110)
+(SUB_imm R14_svc R14_svc 0x0 0x14 0b1110)
+
+(LDR_imm R13 R14_svc 0x000 0b1110)
+(ADD_imm R14_svc R14_svc 0x0 0x04 0b1110)
+(LDR_imm R14 R14_svc 0x000 0b1110)
+(SUB_imm R14_svc R14_svc 0x0 0x04 0b1110)
+
+(LDR_imm R14_svc R14_svc 0x008 0b1110)
+(MOVS_reg PC R14_svc 0b1110)
+
+(* the expected results:
+Memory:
+============
+24 : 34
+28 : 4
+2c : 8
+30 : c
+34 : ff
+38 : 34
+3c : 4
+40 : 8
+44 : c
+48 : 10
+4c : 14
+50 : 18
+54 : 1c
+58 : 20
+5c : 24
+60 : 28
+64 : 2c
+68 : 30
+6c : 24
+70 : 38
+74 : 38
+
+Registers:
+============
+CPSR : d3, len 32
+PC : 38, len 32
+R0 : 34, len 32
+R1 : 4, len 32
+R10 : 28, len 32
+R11 : 2c, len 32
+R12 : 30, len 32
+R13 : 24, len 32
+R13_svc : 40, len 32
+R14 : 38, len 32
+R14_svc : 38, len 32
+R2 : 8, len 32
+R3 : c, len 32
+R4 : 10, len 32
+R5 : 14, len 32
+R6 : 18, len 32
+R7 : 1c, len 32
+R8 : 20, len 32
+R9 : 24, len 32
+SPSR : ff, len 32
+*)

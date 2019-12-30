@@ -1,0 +1,39 @@
+(* Condition 1: *)
+
+(*
+// precondition: 
+// r2 points to the disp struct
+// OFFSETOF_DISP_DISABLED is correct
+*)
+
+(*Case 1: *)
+(LDRB_imm R1 R2 0x000 0b1110)
+
+(SETREG R1 0x00000001)
+
+(CMP_imm R1 0x0 0x01 0b1110)
+
+
+(*Case 2: *)
+(LDRB_imm R3 R2 0x000 0b1110)
+
+(SETREG R3 0x00000000)
+
+(CMP_imm R3 0x0 0x01 0b1110)
+
+(*
+expect result: 
+R1 = 0x1
+R2 = 0x0
+R3 = 0x0
+
+Flag clear:
+Z (CPSR[30])
+C (CPSR[29])
+
+Flag set:
+N (CPSR[31])
+CPSR = 0x80000000
+*)
+
+

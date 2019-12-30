@@ -1,0 +1,61 @@
+type word = 32 bit
+type halfword = 16 bit
+type byte = 8 bit
+type gpreg = word loc
+
+letstate r0: (*const*) gpreg
+letstate r1: gpreg
+letstate M: 32 bit 4 len 32 ref memory
+
+let reg1: gpreg = r1
+
+def readptr w:word -> word = read[w, 32]
+
+(*
+ * arithmetic
+ *)
+
+defop ADDU rd:gpreg rs:gpreg rt:gpreg {
+   txt = "addu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs b+ *rt ]
+}
+
+(* defop SUBU rd:gpreg rs:gpreg rt:gpreg {
+   txt = "subu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs b- *rt ]
+}
+
+(*
+ * memory
+ *)
+
+defop LW rd:gpreg rs:gpreg offset:16 bit {
+   txt = "lw " ++ rd.txt ++ ", (" ++ offset.txt ++ ")" ++ rs.txt,
+   sem = [
+	     let addr: word = *rs b+ bv_to_len(32, offset) in
+        if rd == r0 then skip else *rd <- read[addr, 32]
+   ]	
+}
+
+defop SW rd:gpreg rs:gpreg offset:16 bit {
+   txt = "sw " ++ rd.txt ++ ", (" ++ offset.txt ++ ")" ++ rs.txt,
+   sem = [
+	   let addr: word = *rs b+ bv_to_len(32, offset) in
+      update[addr, 32] <- *rd
+   ]	
+} *)
+
+defop LA rd:gpreg addr: word {
+   txt = "la " ++ rd.txt ++ addr.txt,
+   sem = [ *rd <- read[addr, 32] ]  
+}
+
+(* defop SW_addr rd:gpreg addr: word {
+   txt = "sw " ++ rd.txt ++ addr.txt,
+   sem = [ update[addr, 32] <- *rd ]  
+} *)
+
+(* defop SETREG rd:gpreg sh:word {
+  txt = "SETREG" ++ rd.txt ++ sh.txt,
+  sem = [ *rd <- sh ]
+}  *)

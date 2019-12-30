@@ -1,0 +1,28 @@
+Command: Synthesize for spec t11.spec and output to t11.out, log to t11.log.raw
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Synthesis with 0 insts failed with 1 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Iter 3 Guessing...	Guessing Time: ???s
+Synthesis with 1 insts failed with 2 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Iter 3 Guessing...	Guessing Time: ???s
+Synthesis with 2 insts failed with 2 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Iter 3 Guessing...	Guessing Time: ???s
+Iter 3 Checking...	Checking Time: ???s
+Synthesis with 3 insts succeeded! Prog:
+(ADD r0 r3)
+(ADD r0 r2)
+(ADD r0 r1)
+	Execution Time: ???s

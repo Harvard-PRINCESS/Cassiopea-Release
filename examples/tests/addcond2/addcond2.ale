@@ -1,0 +1,12 @@
+bind b: ghost_bool
+bind biv: ghost_vec
+bind biv2: ghost_vec
+block addcond2 {
+  pre: 
+  	(b = addcond2()) &&
+  	(biv = get_cont(areareg)) &&
+	(biv2 = get_cont(dispreg))
+  post:
+    (~ b || loaded_addcond2(biv, biv2, true)) &&
+    (b || loaded_addcond2(biv, biv2, false))
+}

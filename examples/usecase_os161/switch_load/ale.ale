@@ -1,0 +1,12 @@
+require value wordsize: int
+require value stackptr: wordsize reg
+require value newframe_arg_reg: wordsize reg
+
+block switch_any {
+   region newslotmem: wordsize bit 1 len wordsize ref
+   let newslotptr: wordsize ptr = [newslotmem, 0]
+
+   let newsp: word = read[newslotptr]
+   pre: *newframe_arg_reg == newslotptr
+   post: *stackptr == newsp
+}

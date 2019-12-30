@@ -1,0 +1,2 @@
+switch_enter: cleanup for switchframe_switch
+This pops the switchframe off the stack.

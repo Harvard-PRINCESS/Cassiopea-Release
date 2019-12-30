@@ -1,0 +1,16 @@
+--- t21.log.good	2019-12-16 13:59:49.414496083 -0800
++++ t21.log	2019-12-16 14:12:09.737932071 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t21.prog with start state t21.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t21.prog with start state t21.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -39,4 +41,4 @@
+ wt: R1
+ rd: CPSR R2
+ wt: R1
+-	Execution Time: 0.003743s
++	Execution Time: 0.003755s

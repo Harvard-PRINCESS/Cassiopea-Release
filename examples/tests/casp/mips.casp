@@ -1,0 +1,242 @@
+type word = 32 bit
+type halfword = 16 bit
+type register = word loc
+type byte = 8 bit
+type gpreg = word loc
+
+letstate r0: (*const*) gpreg
+(*letstate r1: gpreg*)
+letstate r2: gpreg
+letstate r3: gpreg
+(*letstate r4: gpreg*)
+(*letstate r5: gpreg*)
+(*letstate r6: gpreg*)
+(*letstate r7: gpreg*)
+letstate r8: gpreg
+letstate r9: gpreg
+(*letstate r10: gpreg*)
+(*letstate r11: gpreg*)
+(*letstate r12: gpreg*)
+(*letstate r13: gpreg*)
+(*letstate r14: gpreg*)
+(*letstate r15: gpreg*)
+(*letstate r16: gpreg*)
+(*letstate r17: gpreg*)
+(*letstate r18: gpreg*)
+(*letstate r19: gpreg*)
+(*letstate r20: gpreg*)
+(*letstate r21: gpreg*)
+(*letstate r22: gpreg*)
+(*letstate r23: gpreg*)
+(*letstate r24: gpreg*)
+(*letstate r25: gpreg*)
+(*letstate r26: gpreg*)
+(*letstate r27: gpreg*)
+(*letstate r28: gpreg*)
+(*letstate r29: gpreg*)
+(*letstate r30: gpreg*)
+(*letstate r31: gpreg*)
+
+(********** alewife mappings **********)
+let dispreg: gpreg = r2
+let resultreg: gpreg = r8
+let areareg: gpreg = r3
+let pcreg: gpreg = r9
+
+def get_memcont r: register -> word = 
+	read[ *r, 32]
+def get_cont r: register -> word =
+	*r
+
+(* add3.ale *)
+def add3 -> bool = true
+def loaded_add3 biv: word b: bool -> bool = 
+  let dR8: word = *resultreg in
+  let dR2: word = *dispreg in
+  let dR3: word = *areareg in
+  let dR9: word = *pcreg in
+  if b then 
+    (dR8 == biv b+ 0x00000001) && 
+    (dR3 == biv b+ 0x00000003) && 
+    (dR9 == biv b+ 0x00000005)
+  else 
+    (dR8 == biv b+ 0x00000001) && 
+    (dR3 == biv b+ 0x00000003) && 
+    (dR9 == biv b+ 0x00000005)
+
+def pre_add3 b1: word b2: word b3: word b4: word -> bool =
+  *r0 == 0x00000000 && *r2 == b1 && *r3 == b2 && *r8 == b3 && *r9 == b4
+
+def was_add3 b1: word b2: word b3: word b4: word -> bool =
+  *r2 == b1 b+ b2 b+ b3 b+ b4
+
+
+(* Load 16-bit signed immediate *)
+def read_simm16 (imm: 16 bit) -> 32 bit =
+	let tmp: 32 bit = bv_to_len(32, imm) in
+        if (imm & 0b1000000000000000) != 0b0000000000000000 then
+           tmp | 0b11111111111111110000000000000000
+        else tmp
+
+(* Load 16-bit unsigned immediate *)
+def read_uimm16 (imm: 16 bit) -> 32 bit =
+	bv_to_len(32, imm)
+
+(* Load 5-bit unsigned immediate *)
+def read_uimm5 (imm: 5 bit) -> 32 bit =
+	bv_to_len(32, imm)
+
+(* Signed shift-right *)
+def signedshift (x: 32 bit) (amt: 5 bit) -> 32 bit =
+        let tmp: 32 bit = x >> bv_to_len(32, amt) in
+        if (x & 0b10000000000000000000000000000000) != 0b00000000000000000000000000000000 then
+           let lsamt: 5 bit = (0b11111 b- amt) b+ 0b00001 (* 32 - amt *) in
+           let ones: 32 bit = 0b11111111111111111111111111111111 in
+           tmp | (ones << bv_to_len(32, lsamt))
+        else tmp
+
+(* Produce zero or one *)
+def truthval (x: bool) -> 32 bit =
+	x ? 0b00000000000000000000000000000001
+          : 0b00000000000000000000000000000000
+
+
+(*
+ * arithmetic
+ *)
+
+defop ADDU rd:gpreg rs:gpreg rt:gpreg {
+   txt = "addu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs b+ *rt ]
+}
+
+defop ADDIU rd:gpreg rs:gpreg simm16:16 bit {
+   txt = "addiu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs b+ read_simm16(simm16) ]
+}
+
+defop SUBU rd:gpreg rs:gpreg rt:gpreg {
+   txt = "subu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs b- *rt ]
+}
+
+defop LUI rd:gpreg uimm16:16 bit {
+   txt = "lui " ++ rd.txt ++ ", " ++ uimm16.txt,
+   sem = [ if rd == r0 then skip else *rd <- read_uimm16(uimm16) << 0x00000010 ]
+}
+
+(*
+ * comparisons
+ *)
+
+defop SLT rd:gpreg rs:gpreg rt:gpreg {
+   txt = "slt " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- truthval( *rs bs< *rt) ]
+}
+
+defop SLTU rd:gpreg rs:gpreg simm16:16 bit {
+   txt = "slti " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt,
+   sem = [ if rd == r0 then skip else *rd <- truthval( *rs bs< read_simm16(simm16)) ]
+}
+
+defop SLTI rd:gpreg rs:gpreg rt:gpreg {
+   txt = "slt " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- truthval( *rs b< *rt) ]
+}
+
+defop SLTIU rd:gpreg rs:gpreg simm16:16 bit {
+   txt = "sltiu " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ simm16.txt,
+   sem = [ if rd == r0 then skip else *rd <- truthval( *rs b< read_simm16(simm16)) ]
+}
+
+(*
+ * bitwise ops
+ *)
+
+defop AND rd:gpreg rs:gpreg rt:gpreg {
+   txt = "and " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs & *rt ]
+}
+
+defop ANDI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = "andi " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs & read_uimm16(uimm16) ]
+}
+
+defop NOR rd:gpreg rs:gpreg rt:gpreg {
+   txt = "nor " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs | ~( *rt) ]
+}
+
+defop OR rd:gpreg rs:gpreg rt:gpreg {
+   txt = "or " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs | *rt ]
+}
+
+defop ORI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = "ori " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs | read_uimm16(uimm16) ]
+}
+
+defop XOR rd:gpreg rs:gpreg rt:gpreg {
+   txt = "or " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs ^ *rt ]
+}
+
+defop XORI rd:gpreg rs:gpreg uimm16:16 bit {
+   txt = "ori " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm16.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs ^ read_uimm16(uimm16) ]
+}
+
+(*
+ * shifts
+ *)
+
+defop SLLV rd:gpreg rs:gpreg rt:gpreg {
+   txt = "sllv " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs << ( *rt & 0x0000001f) ]
+}
+
+defop SLL rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = "sll " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs << read_uimm5(uimm5) ]
+}
+
+defop SRAV rd:gpreg rs:gpreg rt:gpreg {
+   txt = "srav " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- signedshift( *rs, bv_to_len(5, ( *rt & 0x0000001f))) ]
+}
+
+defop SRA rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = "sra " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt,
+   sem = [ if rd == r0 then skip else *rd <- signedshift( *rs, uimm5) ]
+}
+
+defop SRLV rd:gpreg rs:gpreg rt:gpreg {
+   txt = "srlv " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ rt.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs >> ( *rt & 0x0000001f) ]
+}
+
+defop SRL rd:gpreg rs:gpreg uimm5:5 bit {
+   txt = "srl " ++ rd.txt ++ ", " ++ rs.txt ++ ", " ++ uimm5.txt,
+   sem = [ if rd == r0 then skip else *rd <- *rs >> read_uimm5(uimm5) ]
+}
+
+(*
+ * memory
+ *)
+defop LW rd:gpreg rs:gpreg offset:16 bit {
+   txt = "lw " ++ rd.txt ++ ", (" ++ offset.txt ++ ")" ++ rs.txt,
+   sem = [
+      let addr : word = *rs b+ read_simm16(offset) in
+        if rd == r0 then skip else *rd <- read[addr, 32]
+   ]	
+}
+
+defop SW rd:gpreg rs:gpreg offset:16 bit {
+   txt = "sw " ++ rd.txt ++ ", (" ++ offset.txt ++ ")" ++ rs.txt,
+   sem = [
+      let addr : word = *rs b+ read_simm16(offset) in
+        update[addr, 32] <- *rd
+  ]
+}

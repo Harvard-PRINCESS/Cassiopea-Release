@@ -1,0 +1,12 @@
+require value wordsize: int
+require value stackptr: wordsize reg
+require value oldframe_arg_reg: wordsize reg
+
+block switch_any {
+   region oldslotmem: wordsize bit 1 len wordsize ref
+   let oldslotptr: wordsize ptr = [oldslotmem, 0]
+
+   let oldsp: word = *stackptr
+   pre: *oldframe_arg_reg == oldslotptr
+   post: read[oldslotptr] == oldsp
+}

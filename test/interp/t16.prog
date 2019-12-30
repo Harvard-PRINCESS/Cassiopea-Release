@@ -1,0 +1,17 @@
+(* Condition 2: *)
+(LDR_imm R1 R2 0x000 0b1110)
+
+(* Case 1: R1 > LR *)
+(CMP_reg R1 R14 0b1110)
+(MOV_imm R1 0x0 0x00 0b1000)
+
+(*
+expect result: 
+R1 = 0x10 -> 0x00
+R14 = 0x1
+
+Flag set:
+C (CPSR[29])
+CPSR = 0x20000000
+*)
+

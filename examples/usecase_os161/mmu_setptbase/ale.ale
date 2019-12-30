@@ -1,0 +1,11 @@
+require value wordsize: int
+require value reg_arg_ptbase: wordsize reg
+
+require function ptbase_aligned: (wordsize vec) bool
+require function mmu_ptbase: () wordsize vec
+
+block mmu_setptbase {
+   let ptbase: word = *reg_arg_ptbase
+   pre: ptbase_aligned(ptbase)
+   post: mmu_ptbase() == ptbase
+}

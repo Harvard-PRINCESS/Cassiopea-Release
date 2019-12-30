@@ -1,0 +1,4 @@
+lea 0x0xb(%rcx), %rax
+cmp %rbx, $0x00000000
+cmovz %rcx, %rax
+lea 0x0x5(%rax), %rcx

@@ -1,0 +1,19 @@
+Command: Synthesize for spec t03.spec and output to t03.out, log to t03.log.raw
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Synthesis with 0 insts failed with 1 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Iter 3 Guessing...	Guessing Time: ???s
+Synthesis with 1 insts failed with 2 counterexamples!
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Iter 2 Guessing...	Guessing Time: ???s
+Iter 2 Checking...	Checking Time: ???s
+Synthesis with 2 insts succeeded! Prog:
+(LC r0 0b11111111111111111)
+(MTC r0)
+	Execution Time: ???s

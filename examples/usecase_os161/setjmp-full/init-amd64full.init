@@ -1,0 +1,3 @@
+(memory buf: 64 bit 8 len 64 ref)
+(RDI = [buf, 0])
+

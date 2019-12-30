@@ -1,0 +1,4 @@
+(* github issue #161: non-pointer accesses *)
+(LC r0 0x01)
+(LC r1 0x02)
+(SW r1 r0)

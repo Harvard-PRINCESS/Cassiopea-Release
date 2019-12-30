@@ -1,0 +1,9 @@
+bind cont: ghost_vec
+bind disp: ghost_ptr
+block ptr {
+  pre: 
+	(disp = get_cont(dispreg))
+  post:
+    get_memcont(disp) = get_cont(resultreg)
+}
+

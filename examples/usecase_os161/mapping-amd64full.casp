@@ -1,0 +1,99 @@
+(********** alewife mappings **********)
+
+module longjmp_full {
+	let reg_arg_buf: register = RDI
+	let reg_arg_retval: register = RSI
+	let reg_retval: register = RAX
+	let JB_LEN: int = 8
+	(* letstate buf : 64 bit 11 len 64 ref memory *)
+	let pre_rcx: 64 bit = fetch [bufptr b+ 0x0000000000000000, 64]
+	let pre_rsp: 64 bit = fetch [bufptr b+ 0x0000000000000008, 64]
+	let pre_rbp: 64 bit = fetch [bufptr b+ 0x0000000000000010, 64]
+	let pre_rbx: 64 bit = fetch [bufptr b+ 0x0000000000000018, 64]
+	let pre_r12: 64 bit = fetch [bufptr b+ 0x0000000000000020, 64]
+	let pre_r13: 64 bit = fetch [bufptr b+ 0x0000000000000028, 64]
+	let pre_r14: 64 bit = fetch [bufptr b+ 0x0000000000000030, 64]
+	let pre_r15: 64 bit = fetch [bufptr b+ 0x0000000000000038, 64]
+	def jmp_bufloaded -> bool =
+	   *RCX == pre_rcx &&
+	   *RSP == pre_rsp &&
+	   *RBP == pre_rbp &&
+	   *RBX == pre_rbx &&
+	   *R12 == pre_r12 &&
+	   *R13 == pre_r13 &&
+	   *R14 == pre_r14 &&
+	   *R15 == pre_r15
+
+	reg-modify: C Z
+}
+
+module setjmp_full {
+	let reg_arg_buf: register = RDI
+	let reg_retval: register = RAX
+	let JB_LEN: int = 8
+	(* letstate buf : 64 bit 11 len 64 ref memory *)
+	let pre_rcx: 64 bit = *RCX
+	let pre_rsp: 64 bit = *RSP
+	let pre_rbp: 64 bit = *RBP
+	let pre_rbx: 64 bit = *RBX
+	let pre_r12: 64 bit = *R12
+	let pre_r13: 64 bit = *R13
+	let pre_r14: 64 bit = *R14
+	let pre_r15: 64 bit = *R15
+	def jmp_bufsaved (bufptr: word) -> bool =
+	   fetch [bufptr b+ 0x0000000000000000, 64] == pre_rcx &&
+	   fetch [bufptr b+ 0x0000000000000008, 64] == pre_rsp &&
+	   fetch [bufptr b+ 0x0000000000000010, 64] == pre_rbp &&
+	   fetch [bufptr b+ 0x0000000000000018, 64] == pre_rbx &&
+	   fetch [bufptr b+ 0x0000000000000020, 64] == pre_r12 &&
+	   fetch [bufptr b+ 0x0000000000000028, 64] == pre_r13 &&
+	   fetch [bufptr b+ 0x0000000000000030, 64] == pre_r14 &&
+	   fetch [bufptr b+ 0x0000000000000038, 64] == pre_r15
+}
+
+module switch_all {
+	(* full context switch *)
+	let switchframesize: 64 bit = 0x0000000000000040 (* 44; 40 for OS/161 *)
+	let switchframecount: int = 8 (* 44/sizeof word *)
+	let stackptr: 64 bit loc = RSP
+	let stacksgrowup: bool = false
+	let oldframe_arg_reg: 64 bit loc = RAX
+	let newframe_arg_reg: 64 bit loc = RCX
+
+	let old_rbx: 64 bit = *RBX
+	let old_rbp: 64 bit = *RBP
+	let old_rdi: 64 bit = *RDI
+	let old_rsi: 64 bit = *RSI
+	let old_r12: 64 bit = *R12
+	let old_r13: 64 bit = *R13
+	let old_r14: 64 bit = *R14
+	let old_r15: 64 bit = *R15
+        def switchframe_saved -> bool =
+	   fetch [oldframe_base b+ 0x0000000000000000, 64] == old_rbx &&
+	   fetch [oldframe_base b+ 0x0000000000000008, 64] == old_rbp &&
+	   fetch [oldframe_base b+ 0x0000000000000010, 64] == old_rdi &&
+	   fetch [oldframe_base b+ 0x0000000000000018, 64] == old_rsi &&
+	   fetch [oldframe_base b+ 0x0000000000000020, 64] == old_r12 &&
+	   fetch [oldframe_base b+ 0x0000000000000028, 64] == old_r13 &&
+	   fetch [oldframe_base b+ 0x0000000000000030, 64] == old_r14 &&
+	   fetch [oldframe_base b+ 0x0000000000000038, 64] == old_r15
+
+	let new_rbx: word = fetch [newframe_base b+ 0x0000000000000000, 64]
+	let new_rbp: word = fetch [newframe_base b+ 0x0000000000000008, 64]
+	let new_rdi: word = fetch [newframe_base b+ 0x0000000000000010, 64]
+	let new_rsi: word = fetch [newframe_base b+ 0x0000000000000018, 64]
+	let new_r12: word = fetch [newframe_base b+ 0x0000000000000020, 64]
+	let new_r13: word = fetch [newframe_base b+ 0x0000000000000028, 64]
+	let new_r14: word = fetch [newframe_base b+ 0x0000000000000030, 64]
+	let new_r15: word = fetch [newframe_base b+ 0x0000000000000038, 64]
+        def switchframe_loaded -> bool =
+	   *RBX == new_rbx &&
+	   *RBP == new_rbp &&
+	   *RDI == new_rdi &&
+	   *RSI == new_rsi &&
+	   *R12 == new_r12 &&
+	   *R13 == new_r13 &&
+	   *R14 == new_r14 &&
+	   *R15 == new_r15
+
+}

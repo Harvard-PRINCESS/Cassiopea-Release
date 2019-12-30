@@ -1,0 +1,16 @@
+--- t15.log.good	2019-12-16 13:59:49.414496083 -0800
++++ t15.log	2019-12-16 14:12:09.693932051 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t15.prog with start state t15.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t15.prog with start state t15.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -165,4 +167,4 @@
+ wt: R3
+ rd: CPSR R3
+ wt: CPSR
+-	Execution Time: 0.004535s
++	Execution Time: 0.004397s

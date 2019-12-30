@@ -1,0 +1,7 @@
+bind biv: ghost_vec
+block add3 {
+  pre: 
+  	biv = get_cont(dispreg)
+  post:
+    loaded_add3(biv)
+}

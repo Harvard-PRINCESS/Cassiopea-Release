@@ -1,0 +1,27 @@
++coninit
++dup
++concrete
++swap
++syminit
++symbolic
++substitute
++assertconeq
+Check succeeded
++coninit
++dup
++concrete
++swap
++syminit
++symbolic
++substitute
++assertconeq
+Check succeeded
++coninit
++dup
++concrete
++swap
++syminit
++symbolic
++substitute
++assertconeq
+Check succeeded

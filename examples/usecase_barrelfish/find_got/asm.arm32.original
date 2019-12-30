@@ -1,0 +1,16 @@
+// file: kernel/aarmv7/bsp_start.S
+
+adr r4, stack_got_prel
+ldr r5, [r4]
+ldr r6, stack_got_offset
+
+// We have:
+//  - r4 = &stack_got_prel
+//  - r5 = GOT(kernel_stack) - &stack_got_prel
+//  - r6 = GOT(kernel_stack) - GOT_ORG
+
+add r4, r5, r4 // r4 = GOT(kernel_stack)
+sub r4, r4, r6 // r4 = GOT_ORG
+
+// Set the PIC register.
+mov PIC_REGISTER, r4

@@ -1,0 +1,37 @@
+as of friday night 6/22 at 3am:
+
+ - on a simple input example it produces an output .c file that can be
+   compiled with four different gccs into something we can plausibly
+   extract asm from. (x86_64, i386, sparc64, armv7)
+
+ - it is generating void as the return type of the extraction function
+   incorrectly for the simple example. this does not probably matter but is
+   causing a compiler warning.
+
+ - it doesn't yet have logic to run the compiler itself, or to postprocess
+   the compiler output.
+
+ - it also doesn't have logic to cpp the input file, which was part of the
+   intent. (so it should also accept and pass through -D and -I args, etc.)
+
+ - it should probably support noreturn functions explicitly and doesn't yet.
+
+none of the above is particularly difficult, I'm just not quite done and it's
+3am.
+
+there is a problem though which is shown up by the i386 output:
+   /APP
+   # 7 "nautasm_blef.c" 1
+	   nautilusbegin %eax
+   # 0 "" 2
+   /NO_APP
+	   movl    %eax, (%esp)
+	   call    blef
+   /APP
+   # 12 "nautasm_blef.c" 1
+	   nautilusend %eax
+   # 0 "" 2
+   /NO_APP
+it assumes there's space at 0(%esp) that it can scribble in, and
+I'm not sure how we detect this assumption and cause casp to
+honor it.

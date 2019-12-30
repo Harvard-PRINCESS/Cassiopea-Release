@@ -1,0 +1,16 @@
+This is a widget for extracting calling sequences from a C compiler.
+
+Requirements:
+   - the compiler must behave like a Unix compiler (understand flags
+     like -S, -O2, etc.)
+   - the compiler must understand simple gcc-style asm directives
+     (gcc and clang do, others may vary)
+
+Restrictions:
+   - each output is good only for a specific call to a specific
+     function with a specific signature
+   - all arguments must fit in registers
+   - the return value must fit in a register
+   - floating point values are not accepted
+   - without additional out-of-band knowledge must assume that all
+     machine state and registers are destroyed by the call

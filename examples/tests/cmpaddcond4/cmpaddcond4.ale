@@ -1,0 +1,10 @@
+bind b: ghost_bool
+bind dispbv: ghost_vec
+block cmpaddcond4 {
+  pre: (dispbv = get_cont(dispreg)) &&
+	is_zero_or_one(resultreg) && 
+	(b = is_zero(resultreg))
+  post:
+    (~ b || loaded_cmpaddcond4(areareg, dispbv, true)) &&
+    (b || loaded_cmpaddcond4(areareg, dispbv, false))
+}

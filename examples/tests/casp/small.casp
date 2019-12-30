@@ -1,0 +1,49 @@
+type word = 32 bit
+type halfword = 16 bit
+type doubleword = 64 bit
+type byte = 8 bit
+type register = word loc
+type doubleregister = doubleword loc
+type cond_field = 2 bit
+type rotate_imm4 = 4 bit
+type imm8 = 8 bit
+type imm12 = 12 bit
+type imm5 = 5 bit
+type flg = 1 bit loc
+
+(*CPSR current program status register*)
+(* letstate N: flg (* CPSR[31] *)
+letstate Z: flg (* CPSR[30] *)
+letstate C: flg (* CPSR[29] *)
+letstate V: flg (* CPSR[28] *) *)
+(* letstate R0: register  (* first function argument *) *)
+letstate R1: register  (* second function argument *)
+letstate R2: register  (* third function argument *)
+(* letstate R14: register  (* link register *) *)
+(* letstate M1: 32 bit 4 len 32 ref memory *)
+	
+defop ADD Rd: register Rn: register Imm: word {
+	txt = "ADD" ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Imm.txt,
+	sem = [ *Rd <- *Rn b+ Imm ]
+}
+
+defop SUB Rd: register Rn: register Imm: word {
+	txt = "ADD" ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Imm.txt,
+	sem = [ *Rd <- *Rn b- Imm ]
+}
+
+(*word: register offset pre-indexed*)
+defop LDR Rd: register Rn: register Imm: word {
+	txt = "LDR" ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ "," ++ Imm.txt ++ "]", 
+	sem = [ let out: word = *Rn b+ Imm in *Rd <- fetch[out, 32] ]
+}
+
+defop STR Rs: register Rn: register Imm: word {
+	txt = "STR" ++ Rs.txt ++ "," ++ "[" ++ Rn.txt ++ "," ++ Imm.txt ++ "]", 
+	sem = [ let out: word = *Rn b+ Imm in store[out, 32] <- *Rs ]	
+}
+
+defop SETREG Rd: register sh: word {
+	txt = "SETREG" ++ Rd.txt ++ sh.txt,
+	sem = [ *Rd <- sh ]
+}

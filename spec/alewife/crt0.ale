@@ -1,0 +1,23 @@
+require val dispatcher_ptr: ptr
+require val stack_init: ptr
+require val p1reg: reg (*first param*)
+require val p2reg: reg (*second param*)
+require val stack_ptr: reg (*SP*)
+
+require val init_or_not: bool
+
+accesses p1reg
+
+modifies p2reg
+modifies stack_ptr
+
+pre:
+	*p1reg = dispatcher_ptr
+
+post:
+	*stack_ptr = stack_init
+	if init_or_not then
+		*p2reg = 0
+	else 
+		*p2reg = 1
+	(* then we will branch to barrelfish_init_disabled *)

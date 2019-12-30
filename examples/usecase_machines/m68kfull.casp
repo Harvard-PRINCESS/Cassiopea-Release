@@ -1,0 +1,2421 @@
+(*
+ * m68k
+ *
+ * This is based on an old Sybex m68000 book dholland had lying around
+ * at home. It is probably missing stuff that one could take advantage
+ * of on later 68k models, but that probably also doesn't matter that
+ * much.
+ *
+ * This version has a lot more addressing mode versions, which casp
+ * isn't really equipped to handle tidily or efficiently.
+ *)
+
+type word = 32 bit
+type halfword = 16 bit
+type byte = 8 bit
+type reg = word loc
+
+type wordlabel = 32 label
+
+(*
+ * Registers
+ *
+ * Note: in assembly syntax R.B is the bottom 8 bits, R.W is the
+ * bottom 16 bits, and R.L is the whole thing.
+ *
+ * For A regs, loading a 16-bit value sign-extends it, and the .B suffix
+ * is not supported. Also, on the oldest models the upper 8 bits of the
+ * A regs is missing. (Not sure if this means it always reads as 0 or if
+ * it's implicitly sign-extended from the lower 24 bits, but for casp we
+ * don't need to care.)
+ *
+ * For D regs, loading 8-bit or 16-bit values leaves the upper bits
+ * unchanged.
+ *)
+
+
+(* 8 address registers A0..A7 (A7 is the stack pointer) *)
+letstate A0: reg
+letstate A1: reg
+letstate A2: reg
+letstate A3: reg
+letstate A4: reg
+letstate A5: reg
+letstate A6: reg
+letstate A7: reg
+
+(* 8 data registers D0..D7 *)
+letstate D0: reg
+letstate D1: reg
+letstate D2: reg
+letstate D3: reg
+letstate D4: reg
+letstate D5: reg
+letstate D6: reg
+letstate D7: reg
+
+def isA r:reg -> bool =
+   r == A0 || r == A1 || r == A2 || r == A3 ||
+   r == A4 || r == A5 || r == A6 || r == A7
+
+def isD r:reg -> bool =
+   r == D0 || r == D1 || r == D2 || r == D3 ||
+   r == D4 || r == D5 || r == D6 || r == D7
+
+
+(*
+ * Status register
+ *
+ * in the assembler, this can be referred to as SR for the whole thing
+ * or CCR for just the user part.
+ *)
+
+(* supervisor-only *)
+letstate TF: 1 bit loc	(* trace enable *)
+letstate SF: 1 bit loc	(* supervisor mode *)
+letstate IRQ: 3 bit loc	(* interrupt mask (1 = masked) *)
+
+(* user *)
+letstate XF: 1 bit loc	(* extended carry *)
+letstate NF: 1 bit loc	(* negative *)
+letstate ZF: 1 bit loc	(* zero *)
+letstate VF: 1 bit loc	(* overflow *)
+letstate CF: 1 bit loc	(* carry *)
+
+def readccr -> byte =
+   let xf:byte = bv_to_len(8, *XF) << 0x04 in
+   let nf:byte = bv_to_len(8, *NF) << 0x03 in
+   let zf:byte = bv_to_len(8, *ZF) << 0x02 in
+   let vf:byte = bv_to_len(8, *VF) << 0x01 in
+   let cf:byte = bv_to_len(8, *CF) in
+   xf | nf | zf | vf | cf
+
+def readsr -> halfword =
+   let ccr:halfword = bv_to_len(16, readccr ()) in
+   let tf:halfword  = bv_to_len(16, *TF) << 0x000f in
+   let sf:halfword  = bv_to_len(16, *SF) << 0x000d in
+   let irq:halfword = bv_to_len(16, *IRQ) << 0x0008 in
+   tf | sf | irq | ccr
+
+proc writeccr (k: 8 bit) =
+   *XF <- bv_to_len(1, k >> 0x04);
+   *NF <- bv_to_len(1, k >> 0x03);
+   *ZF <- bv_to_len(1, k >> 0x02);
+   *VF <- bv_to_len(1, k >> 0x01);
+   *CF <- bv_to_len(1, k >> 0x00)
+
+proc writesr (k: 16 bit) =
+   assert ( *SF == 0b1); (* must be in supervisor mode *)
+   writeccr (bv_to_len(8, k));
+   *TF <- bv_to_len(1, k >> 0x000f);
+   *SF <- bv_to_len(1, k >> 0x000d);
+   *IRQ <- bv_to_len(3, k >> 0x0008)
+
+(*
+ * sign-extension tools
+ * (why these aren't builtins... sigh)
+ *)
+def signextend8 (x: 8 bit) -> 32 bit =
+   let tmp: 32 bit = bv_to_len(32, x) in
+   if (x & 0b10000000) != 0b00000000 then
+      tmp | 0b11111111111111111111111100000000
+   else tmp
+def signextend16 (x: 16 bit) -> 32 bit =
+   let tmp: 32 bit = bv_to_len(32, x) in
+   if (x & 0b1000000000000000) != 0b0000000000000000 then
+      tmp | 0b11111111111111110000000000000000
+   else tmp
+   
+
+(*
+ * signed right shift
+ * (should also be a builtin)
+ *)
+def signedrightshift (x: 32 bit) (amt: 32 bit) -> 32 bit =
+   let tmp: 32 bit = x >> amt in
+   if (x & 0x80000000) != 0x00000000 then
+      let lsamt: 32 bit = 0x00000020 b- amt in
+      let ones: 32 bit = 0xffffffff in
+      tmp | (ones << lsamt)
+   else tmp
+
+(*
+ * Addressing modes.
+ *
+ * The m68k has these addressing modes, that appear in most instructions:
+ *  - D direct: use the value of a data register
+ *  - A direct: use the value of an address register
+ *  - A indirect: fetch from the address in an address register
+ *  - A indirect, postincrement: same, increments register by access size
+ *  - A indirect, predecrement: same, decrements register by access size
+ *  - A indirect, offset:
+ *       fetch 16-bit immediate value from instruction stream,
+ *       sign-extend it, add it to the address
+ *  - A indirect, offset and index register:
+ *       fetch 8-bit register subopcode and 8-bit offset from
+ *       instruction stream, sign-extend offset, add all to the address
+ *       The index register can be either A or D.
+ *  - absolute short address:
+ *       fetch a 16-bit immediate from instruction stream, sign-extend,
+ *       use as address
+ *  - absolute long address:
+ *       fetch a 32-bit immediate from instruction stream, use as address
+ *  - PC with offset, PC with offset index register:
+ *       like the correspoding A indirect forms, but uses the PC as the base
+ *  - immediate:
+ *       fetch immediate from instruction stream (either 16 or 32 depending
+ *       on instruction), use as value, source fields only
+ *  - status register:
+ *       write to status register, destination fields only
+ *
+ * If casp had ADTs we could just make a type for one of these and have
+ * a single function for turning it into a value, but it doesn't, and
+ * because of the different immediates we can't just have one defop per
+ * instruction; we need a different one for each instruction form that
+ * has different concrete operands.
+ *
+ * We mark these with a suffix on the instruction name composed from
+ * one or more of the following:
+ *    i - immediate.
+ *    r - register. D and/or A direct.
+ *    m - memory. A indirect with or without offset.
+ *    x - memory indexed. A indirect with offset and index register.
+ *    a - memory absolute. Absolute address (long or short).
+ *    s - status register.
+ *    c - control codes register.
+ *
+ * Note that we assume the assembler can figure out on its own that A
+ * indirect with offset, when the offset is a constant 0, can be
+ * encoded without the zero offset in the instruction stream. We also
+ * assume the assembler (or more likely the linker) figures out short
+ * vs. long absolute addresses.
+ *
+ * We don't provide the predecrement and postincrement modes at all;
+ * we assume the hypothetical peephole optimizer will know about those
+ * and deploy them for us. We also don't provide the PC-relative modes
+ * at all, at least for now... we don't have a good way to use them.
+ *
+ * Also I have completely ignored all the halfword-sized and byte-sized
+ * operations, both on partial registers and on memory. Probably at
+ * least some of the byte-sized memory accesses will be needed...
+ *)
+
+def get_r r:reg -> word =
+   *r
+def get_m r:reg off:halfword -> word =
+   let addr: word = *r b+ signextend16(off) in
+   fetch[addr, 32]
+def get_x r:reg ix:reg off:byte -> word =
+   let addr: word = *r b+ *ix b+ signextend8(off) in
+   fetch[addr, 32]
+def get_a a:wordlabel -> word =
+   fetch[a, 32]
+
+proc put_r r:reg x:word =
+   *r <- x
+proc put_m r:reg off:halfword x:word =
+   let addr: word = *r b+ signextend16(off) in
+   store[addr, 32] <- x
+proc put_x r:reg ix:reg off:byte x:word =
+   let addr: word = *r b+ *ix b+ signextend8(off) in
+   store[addr, 32] <- x
+proc put_a a:wordlabel x:word =
+   store[a, 32] <- x
+
+def fmt_i i:word -> string = format("#$1", i.hex)
+def fmt_r r:reg -> string = r.txt
+def fmt_m r:reg off:halfword -> string = format("$1($2)", r.txt, off.hex)
+def fmt_x r:reg ix:reg off:byte -> string =
+   format("$1($2, $3)", r.txt, ix.txt, off.hex)
+def fmt_a a:wordlabel -> string = a.lbl
+
+
+def get_m16 r:reg off:halfword -> halfword =
+   let addr: word = *r b+ signextend16(off) in
+   fetch[addr, 16]
+def get_x16 r:reg ix:reg off:byte -> halfword =
+   let addr: word = *r b+ *ix b+ signextend8(off) in
+   fetch[addr, 16]
+def get_a16 a:wordlabel -> halfword =
+   fetch[a, 16]
+
+def get_m8 r:reg off:halfword -> byte =
+   let addr: word = *r b+ signextend16(off) in
+   fetch[addr, 8]
+def get_x8 r:reg ix:reg off:byte -> byte =
+   let addr: word = *r b+ *ix b+ signextend8(off) in
+   fetch[addr, 8]
+def get_a8 a:wordlabel -> byte =
+   fetch[a, 8]
+
+
+
+(*
+ * There are two versions of add: one adds a data register to an
+ * arbitrary operand, and the other adds an arbitrary operand to a
+ * data register. The destination arbitrary operand can't be a plain
+ * register, and can't be the status register, but even so this gives
+ * us quite a number of forms.
+ *)
+proc setflags_add r:word a:word b:word =
+   (* add overflows if signs are the same and change in the sum *)
+   let overflow: bool = a[31] != b[31] && r[31] != a[31] in
+
+   (* overflow is true if r[31] <> carry *)
+   let carry: bool = if overflow then !r[31] else r[31] in
+
+   *XF <- if carry then 0b1 else 0b0;
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then 0b1 else 0b0;
+   *VF <- if overflow then 0b1 else 0b0;
+   *CF <- if carry then 0b1 else 0b0
+defop ADD_ir srcval:word dest:reg {
+   txt = format("add.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let destval:word = get_r(dest) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop ADD_rr src:reg dest:reg {
+   txt = format("add.l $1, $2", fmt_r(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop ADD_mr src:reg srcoff:halfword dest:reg {
+   txt = format("add.l $1, $2", fmt_m(src, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_m(src, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop ADD_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("add.l $1, $2", fmt_x(src, srcix, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_x(src, srcix, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop ADD_ar src:wordlabel dest:reg {
+   txt = format("add.l $1, $2", fmt_a(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_a(src) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop ADD_rm src:reg dest:reg destoff:halfword {
+   txt = format("add.l $1, $2", fmt_r(src), fmt_m(dest, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_m(dest, destoff) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_m(dest, destoff, result)
+   ]
+}
+defop ADD_rx src:reg dest:reg destix:reg destoff:byte {
+   txt = format("add.l $1, $2", fmt_r(src), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop ADD_ra src:reg dest:wordlabel {
+   txt = format("add.l $1, $2", fmt_r(src), fmt_a(dest)),
+   sem = [
+      assert (isD (src));
+      let srcval: word = get_r(src) in
+      let destval: word = fetch[dest, 32] in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_a(dest, result)
+   ]
+}
+
+(*
+ * adda is like add but (a) outputs to an address register and
+ * (b) doesn't set the flags. The source may be an arbitrary
+ * operand.
+ *)
+defop ADDA_ir srcval:word dest:reg {
+   txt = format("adda $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert (isA (dest));
+      *dest <- srcval b+ *dest
+   ]
+}
+defop ADDA_rr src:reg dest:reg {
+   txt = format("adda $1, $2", fmt_r(src), fmt_r(dest)),
+   sem = [
+      assert (isA (dest));
+      *dest <- *src b+ *dest
+   ]
+}
+defop ADDA_mr src:reg srcoff:halfword dest:reg {
+   txt = format("adda $1, $2", fmt_m(src, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isA (dest));
+      *dest <- get_m(src, srcoff) b+ *dest
+   ]
+}
+defop ADDA_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("adda $1, $2", fmt_x(src, srcix, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isA (dest));
+      *dest <- get_x(src, srcix, srcoff) b+ *dest
+   ]
+}
+defop ADDA_ar src:wordlabel dest:reg {
+   txt = format("adda $1, $2", fmt_a(src), fmt_r(dest)),
+   sem = [
+      assert (isA (dest));
+      *dest <- get_a(src) b+ *dest
+   ]
+}
+
+(*
+ * addi is like add but the source is always an immediate; the
+ * destination can be an arbitrary operand, but not the status register.
+ *)
+defop ADDI_ir srcval:word dest:reg {
+   txt = format("addi.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      let destval: word = get_r(dest) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop ADDI_im srcval:word dest:reg destoff:halfword {
+   txt = format("addi.l $1, $2", fmt_i(srcval), fmt_m(dest, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_m(dest, destoff) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_m(dest, destoff, result)
+   ]
+}
+defop ADDI_ix srcval:word dest:reg destix:reg destoff:byte {
+   txt = format("addi.l $1, $2", fmt_i(srcval), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop ADDI_ia srcval:word dest:wordlabel {
+   txt = format("addi.l $1, $2", fmt_i(srcval), fmt_a(dest)),
+   sem = [
+      let destval: word = get_a(dest) in
+      let result: word = srcval b+ destval in
+      setflags_add(result, srcval, destval);
+      put_a(dest, result)
+   ]
+}
+
+(*
+ * There is an addq ("quick") instruction that adds an immediate value
+ * between 1 and 8 to an arbitrary operand. We assume that we can emit
+ * such adds as addi and either our mythical peephole optimizer or the
+ * assembler will improve it.
+ *)
+
+(*
+ * addx is like add but specialized for adding multiword integers.
+ *)
+proc setflags_addx (r:word) a:word b:word =
+   (* same as setflags_add, except for the ZF behavior *)
+
+   let overflow: bool = a[31] != b[31] && r[31] != a[31] in
+   let carry: bool = if overflow then !r[31] else r[31] in
+
+   *XF <- if carry then 0b1 else 0b0;
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then *ZF else 0b0;
+   *VF <- if overflow then 0b1 else 0b0;
+   *CF <- if carry then 0b1 else 0b0
+defop ADDX_rr src:reg dest:reg {
+   txt = format("addx.l $1, $2", src.txt, dest.txt),
+   sem = [
+      assert(isD(src) && isD(dest));
+      let result: word = *src b+ *dest in
+      setflags_addx(result, *src, *dest);
+      *dest <- result
+   ]
+}
+defop ADDX_mm src:reg dest:reg {
+   txt = format("addx.l -($1), -($2)", src.txt, dest.txt),
+   sem = [
+      assert(isA(src) && isA(dest));
+      *src <- *src b- 0x00000004;
+      *dest <- *dest b- 0x00000004;
+      let srcval: word = fetch[*src, 32] in
+      let destval: word = fetch[*dest, 32] in
+      let result: word = srcval b+ destval in
+      setflags_addx(result, srcval, destval);
+      store[*dest, 32] <- result
+   ]
+}
+
+(*
+ * and has the same modes as add, except that the source can't be
+ * an address register.
+ *)
+proc setflags_and (r:word) =
+   (* XF is not changed *)
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then 0b1 else 0b0;
+   *VF <- 0b0;
+   *CF <- 0b0
+defop AND_ir srcval:word dest:reg {
+   txt = format("and.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let destval: word = get_r(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_r(dest, result)
+   ]
+}
+defop AND_rr src:reg dest:reg {
+   txt = format("and.l $1, $2", fmt_r(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_r(dest, result)
+   ]
+}
+defop AND_mr src:reg srcoff:halfword dest:reg {
+   txt = format("and.l $1, $2", fmt_m(src, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_m(src, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_r(dest, result)
+   ]
+}
+defop AND_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("and.l $1, $2", fmt_x(src, srcix, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_x(src, srcix, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_r(dest, result)
+   ]
+}
+defop AND_ar src:wordlabel dest:reg {
+   txt = format("and.l $1, $2", fmt_a(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_a(src) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_r(dest, result)
+   ]
+}
+defop AND_rm src:reg dest:reg destoff:halfword {
+   txt = format("and.l $1, $2", fmt_r(src), fmt_m(dest, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_m(dest, destoff) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_m(dest, destoff, result)
+   ]
+}
+defop AND_rx src:reg dest:reg destix:reg destoff:byte {
+   txt = format("and.l $1, $2", fmt_r(src), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop AND_ra src:reg dest:wordlabel {
+   txt = format("and.l $1, $2", fmt_r(src), fmt_a(dest)),
+   sem = [
+      assert (isD (src));
+      let srcval: word = get_r(src) in
+      let destval: word = get_a(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_a(dest, result)
+   ]
+}
+
+(*
+ * andi is like and and addi; unlike addi you can output to the
+ * flags register.
+ *)
+defop ANDI_ir srcval:word dest:reg {
+   txt = format("andi.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert(isD(dest));
+      let destval: word = get_r(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_r(dest, result)
+   ]
+}
+defop ANDI_im srcval:word dest:reg destoff:halfword {
+   txt = format("andi.l $1, $2", fmt_i(srcval), fmt_m(dest, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_m(dest, destoff) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_m(dest, destoff, result)
+   ]
+}
+defop ANDI_ix srcval:word dest:reg destix:reg destoff:byte {
+   txt = format("andi.l $1, $2", fmt_i(srcval), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop ANDI_ia srcval:word dest:wordlabel {
+   txt = format("andi.l $1, $2", fmt_i(srcval), fmt_a(dest)),
+   sem = [
+      let destval: word = get_a(dest) in
+      let result: word = srcval & destval in
+      setflags_and(result);
+      put_a(dest, result)
+   ]
+}
+defop ANDI_is srcval:halfword {
+   txt = format("andi.w $1, %sr", srcval.hex),
+   sem = [
+      assert ( *SF == 0b1); (* must be in supervisor mode *)
+      let destval: halfword = readsr() in
+      let result: halfword = srcval & destval in
+      writesr(result)
+   ]
+}
+defop ANDI_ic srcval:byte {
+   txt = format("andi.b $1, %ccr", srcval.hex),
+   sem = [
+      let destval: byte = readccr() in
+      let result: byte = srcval & destval in
+      writeccr(result)
+   ]
+}
+
+(*
+ * asl (signed shift left) has three forms:
+ *   - shift a data register left by 1-8 bits
+ *   - shift a data register left by another data register
+ *   - shift a value in memory left by 1
+ *)
+proc setflags_asl result:word initval:word shiftamt:word =
+   *NF <- if result[31] then 0b1 else 0b0;
+   *ZF <- if result == 0x00000000 then 0b1 else 0b0;
+   if shiftamt == 0x00000000 then
+      (* XF, CF unaffected *)
+      *VF <- 0b0
+   else
+      let shiftedout:word =
+         if shiftamt b> 0x00000020 then initval
+         else initval >> (0x00000020 b- shiftamt)
+      in
+      *XF <- if shiftedout[0] then 0b1 else 0b0;
+      *VF <- if shiftedout != 0x00000000 then 0b1 else 0b0;
+      *CF <- if shiftedout[0] then 0b1 else 0b0
+defop ASL_ir shiftval:4 bit  dest:reg {
+   txt = format("asl.l #$1, $2", shiftval.dec, dest.txt),
+   sem = [
+      assert(0x0 b< shiftval && shiftval b< 0x9);
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = initval << bv_to_len(32, shiftval) in
+      setflags_asl(result, initval, bv_to_len(32, shiftval));
+      *dest <- result
+   ]
+}
+defop ASL_rr shiftreg:reg dest:reg {
+   txt = format("asl.l $1, $2", shiftreg.txt, dest.txt),
+   sem = [
+      assert(isD(shiftreg));
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = initval << *shiftreg in
+      setflags_asl(result, initval, *shiftreg);
+      *dest <- result
+   ]
+}
+defop ASL_m dest:reg destoff:halfword {
+   txt = format("asl.l $2($1)", dest.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ signextend16(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = initval << 0x00000001 in
+      setflags_asl(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop ASL_x dest:reg destix:reg destoff:byte {
+   txt = format("asl.l $3($1, $2)", dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = initval << 0x00000001 in
+      setflags_asl(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop ASL_a dest:wordlabel {
+   txt = format("asl.l $1", dest.lbl),
+   sem = [
+      let initval: word = fetch[dest, 32] in
+      let result: word = initval << 0x00000001 in
+      setflags_asl(result, initval, 0x00000001);
+      store[dest, 32] <- result
+   ]
+}
+
+(*
+ * asr (signed shift right) has three forms:
+ *   - shift a data register left by 1-8 bits
+ *   - shift a data register left by another data register
+ *   - shift a value in memory left by 1
+ *)
+proc setflags_asr result:word initval:word shiftamt:word =
+   *NF <- if result[31] then 0b1 else 0b0;
+   *ZF <- if result == 0x00000000 then 0b1 else 0b0;
+   if shiftamt == 0x00000000 then
+      (* XF unaffected *)
+      (*
+       * XXX: the book I have says this clears CF unlike ASL; bet one
+       * of them's wrong. also see LSL and LSR
+       *)
+      *VF <- 0b0;
+      *CF <- 0b0
+   else
+      let shiftedout:word =
+         if shiftamt b> 0x00000020 then initval
+         else initval << (0x00000020 b- shiftamt)
+      in
+      *XF <- if shiftedout[31] then 0b1 else 0b0;
+      *VF <- 0b0;
+      *CF <- if shiftedout[31] then 0b1 else 0b0
+defop ASR_ir shiftval:4 bit  dest:reg {
+   txt = format("asr.l #$1, $2", shiftval.dec, dest.txt),
+   sem = [
+      assert(0x0 b< shiftval && shiftval b< 0x9);
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = signedrightshift(initval, bv_to_len(32, shiftval)) in
+      setflags_asr(result, initval, bv_to_len(32, shiftval));
+      *dest <- result
+   ]
+}
+defop ASR_rr shiftreg:reg dest:reg {
+   txt = format("asr.l $1, $2", shiftreg.txt, dest.txt),
+   sem = [
+      assert(isD(shiftreg));
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = signedrightshift(initval, *shiftreg) in
+      setflags_asr(result, initval, *shiftreg);
+      *dest <- result
+   ]
+}
+defop ASR_m dest:reg destoff:halfword {
+   txt = format("asr.l $2($1)", dest.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ signextend16(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = signedrightshift(initval, 0x00000001) in
+      setflags_asr(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop ASR_x dest:reg destix:reg destoff:byte {
+   txt = format("asr.l $3($1, $2)", dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = signedrightshift(initval, 0x00000001) in
+      setflags_asr(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop ASR_a dest:wordlabel {
+   txt = format("asr.l $1", dest.lbl),
+   sem = [
+      let initval: word = fetch[dest, 32] in
+      let result: word = signedrightshift(initval, 0x00000001) in
+      setflags_asr(result, initval, 0x00000001);
+      store[dest, 32] <- result
+   ]
+}
+
+(*
+ * branches
+ *)
+defop BCC tgt:byte {
+   txt = format("bcc $1", tgt.hex),
+   sem = [ if *CF == 0b0 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BCS tgt:byte {
+   txt = format("bcs $1", tgt.hex),
+   sem = [ if *CF == 0b1 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BEQ tgt:byte {
+   txt = format("beq $1", tgt.hex),
+   sem = [ if *ZF == 0b0 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BGE tgt:byte {
+   txt = format("bge $1", tgt.hex),
+   sem = [ if *NF == *VF then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BGT tgt:byte {
+   txt = format("bgt $1", tgt.hex),
+   sem = [ if *ZF == 0b0 && *NF == *VF then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BHI tgt:byte {
+   txt = format("bhi $1", tgt.hex),
+   sem = [ if *CF == 0b0 && *ZF == 0b0 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BLE tgt:byte {
+   txt = format("ble $1", tgt.hex),
+   sem = [ if *ZF == 0b1 || *NF != *VF then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BLS tgt:byte {
+   txt = format("bls $1", tgt.hex),
+   sem = [ if *CF == 0b1 || *ZF == 0b1 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BLT tgt:byte {
+   txt = format("blt $1", tgt.hex),
+   sem = [ if *NF != *VF then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BMI tgt:byte {
+   txt = format("bmi $1", tgt.hex),
+   sem = [ if *NF == 0b1 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BNE tgt:byte {
+   txt = format("bne $1", tgt.hex),
+   sem = [ if *ZF == 0b0 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BPL tgt:byte {
+   txt = format("bpl $1", tgt.hex),
+   sem = [ if *NF == 0b0 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BVC tgt:byte {
+   txt = format("bvc $1", tgt.hex),
+   sem = [ if *VF == 0b0 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BVS tgt:byte {
+   txt = format("bvs $1", tgt.hex),
+   sem = [ if *VF == 0b1 then BRANCH(bv_to_uint(tgt)) else skip ]
+}
+defop BRA tgt:byte {
+   txt = format("bra $1", tgt.hex),
+   sem = [ BRANCH(bv_to_uint(tgt)) ]
+}
+
+(*
+ * bchg (bit change) I'm going to punt on for now
+ *)
+
+(*
+ * bclr (bit clear) I'm going to punt on for now
+ *)
+
+(*
+ * bset (bit set) I'm going to punt on for now
+ *)
+
+(*
+ * btst (bit test) I'm going to punt on for now
+ * XXX: but we might need it
+ *)
+
+(*
+ * chk (bounds-check a 16-bit value) I'm going to punt on for now
+ *)
+
+(*
+ * clr (set to zero)
+ *)
+proc setflags_clr =
+   (* XF not affected *)
+   *NF <- 0b0;
+   *ZF <- 0b1;
+   *VF <- 0b0;
+   *CF <- 0b0
+defop CLR_r dest:reg {
+   txt = format("clr $1", dest.txt),
+   sem = [
+      assert(isD(dest));
+      *dest <- 0x00000000
+   ]
+}
+defop CLR_m dest:reg destoff:halfword {
+   txt = format("clr.l $2($1)", dest.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ signextend16(destoff) in
+      setflags_clr();
+      store[addr, 32] <- 0x00000000
+   ]
+}
+defop CLR_x dest:reg destix:reg destoff:byte {
+   txt = format("clr.l $3($1, $2)", dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      setflags_clr();
+      store[addr, 32] <- 0x00000000
+   ]
+}
+defop CLR_a dest:wordlabel {
+   txt = format("clr.l $1", dest.lbl),
+   sem = [
+      setflags_clr();
+      store[dest, 32] <- 0x00000000
+   ]
+}
+
+(*
+ * cmp (compare)
+ * note invariant: cmp only changes the flags
+ *)
+proc setflags_cmp a:word b:word =
+   (* behaves like subtract... of b - a, not a - b *)
+   (* which is like add of b and (-a) *)
+
+   let r: word = b b- a in
+   let overflow: bool = b[31] != !a[31] && r[31] != !a[31]in
+   let carry: bool = if overflow then !r[31] else r[31] in
+
+   (* XF not affected *)
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then 0b1 else 0b0;
+   *VF <- if overflow then 0b1 else 0b0;
+   *CF <- if carry then 0b1 else 0b0
+defop CMP_ir a:word b:reg {
+   txt = format("cmp.l #$1, $2", a.hex, b.txt),
+   sem = [
+      assert(isD(b));
+      setflags_cmp(a, *b)
+   ]
+}
+defop CMP_rr a:reg b:reg {
+   txt = format("cmp.l $1, $2", a.txt, b.txt),
+   sem = [
+      assert(isD(b));
+      setflags_cmp( *a, *b)
+   ]
+}
+defop CMP_mr a:reg aoff:halfword b:reg {
+   txt = format("cmp.l $2($1), $3", a.txt, aoff.hex, b.txt),
+   sem = [
+      assert(isA(a));
+      assert(isD(b));
+      let addr: word = *a b+ signextend16(aoff) in
+      setflags_cmp(fetch[addr, 32], *b)
+   ]
+}
+defop CMP_xr a:reg aix:reg aoff:byte b:reg {
+   txt = format("cmp.l $3($1, $2), $4", a.txt, aix.txt, aoff.hex, b.txt),
+   sem = [
+      assert(isA(a));
+      assert(isD(b));
+      let addr: word = *a b+ *aix b+ signextend8(aoff) in
+      setflags_cmp(fetch[addr, 32], *b)
+   ]
+}
+defop CMP_ar a:wordlabel b:reg {
+   txt = format("cmp.l $1, $2", a.lbl, b.txt),
+   sem = [
+      assert(isD(b));
+      setflags_cmp(fetch[a, 32], *b)
+   ]
+}
+
+(*
+ * cmpa is the same but for address registers
+ *)
+defop CMPA_ir a:word b:reg {
+   txt = format("cmpa.l #$1, $2", a.hex, b.txt),
+   sem = [
+      assert(isA(b));
+      setflags_cmp(a, *b)
+   ]
+}
+defop CMPA_rr a:reg b:reg {
+   txt = format("cmpa.l $1, $2", a.txt, b.txt),
+   sem = [
+      assert(isA(b));
+      setflags_cmp( *a, *b)
+   ]
+}
+defop CMPA_mr a:reg aoff:halfword b:reg {
+   txt = format("cmpa.l $2($1), $3", a.txt, aoff.hex, b.txt),
+   sem = [
+      assert(isA(a));
+      assert(isA(b));
+      let addr: word = *a b+ signextend16(aoff) in
+      setflags_cmp(fetch[addr, 32], *b)
+   ]
+}
+defop CMPA_xr a:reg aix:reg aoff:byte b:reg {
+   txt = format("cmpa.l $3($1, $2), $4", a.txt, aix.txt, aoff.hex, b.txt),
+   sem = [
+      assert(isA(a));
+      assert(isA(b));
+      let addr: word = *a b+ *aix b+ signextend8(aoff) in
+      setflags_cmp(fetch[addr, 32], *b)
+   ]
+}
+defop CMPA_ar a:wordlabel b:reg {
+   txt = format("cmpa.l $1, $2", a.lbl, b.txt),
+   sem = [
+      assert(isA(b));
+      setflags_cmp(fetch[a, 32], *b)
+   ]
+}
+
+(*
+ * cmpi compares an immediate and a general operand
+ * but for some reason the operand can't be an address register
+ * (and it can't be itself an immediate)
+ *)
+defop CMPI_ir a:word b:reg {
+   txt = format("cmpi.l #$1, $2", a.hex, b.txt),
+   sem = [
+      assert(isD(b));
+      setflags_cmp(a, *b)
+   ]
+}
+defop CMPI_im a:word b:reg boff:halfword {
+   txt = format("cmpi.l #$1, $3($2)", a.hex, b.txt, boff.hex),
+   sem = [
+      assert(isA(b));
+      let addr: word = *b b+ signextend16(boff) in
+      setflags_cmp(a, fetch[addr, 32])
+   ]
+}
+defop CMPI_ix a:word b:reg bix:reg boff:byte {
+   txt = format("cmpi.l #$1, $4($2, $3)", a.hex, b.txt, bix.txt, boff.hex),
+   sem = [
+      assert(isA(b));
+      let addr: word = *b b+ *bix b+ signextend8(boff) in
+      setflags_cmp(a, fetch[addr, 32])
+   ]
+}
+defop CMPI_ia a:word b:wordlabel {
+   txt = format("cmpi.l #$1, $2", a.hex, b.lbl),
+   sem = [
+      setflags_cmp(a, fetch[b, 32])
+   ]
+}
+
+(*
+ * cmpm compares two memory values, always with postincrement
+ *)
+defop CMPM a:reg b:reg {
+   txt = format("cmpm.l ($1)+, ($2)+", a.txt, b.txt),
+   sem = [
+      assert(isA(a) && isA(b));
+      let aval: word = fetch[*a, 32] in
+      let bval: word = fetch[*b, 32] in
+      *a <- *a b+ 0x00000004;
+      *b <- *b b+ 0x00000004;
+      setflags_cmp(aval, bval)
+   ]
+}
+
+(*
+ * skip dbcc, it's "designed for looping"
+ *)
+
+(*
+ * divs (signed divide)
+ * this instruction divides a 32 bit by a 16 bit so it won't work so
+ * well, so I'm going to punt it.
+ * (divu too)
+ *)
+
+(*
+ * eor (exclusive or)
+ * this is not like and; the source is always a (data) register and
+ * only the destination can be an arbitrary operand.
+ *)
+proc setflags_eor r:word =
+   (* XF is not changed *)
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then 0b1 else 0b0;
+   *VF <- 0b0;
+   *CF <- 0b0
+defop EOR_rr src:reg dest:reg {
+   txt = format("eor.l $1, $2", src.txt, dest.txt),
+   sem = [
+      assert(isD(src));
+      assert(isD(dest));
+      let result: word = *src ^ *dest in
+      setflags_eor(result);
+      *dest <- result
+   ]
+}
+defop EOR_rm src:reg dest:reg destoff:halfword {
+   txt = format("eor.l $1, $3($2)", src.txt, dest.txt, destoff.hex),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let addr: word = *dest b+ signextend16(destoff) in
+      let destval: word = fetch[addr, 32] in
+      let result: word = *src ^ destval in
+      setflags_eor(result);
+      store[addr, 32] <- result
+   ]
+}
+defop EOR_rx src:reg dest:reg destix:reg destoff:byte {
+   txt = format("eor.l $1, $4($2,$3)", src.txt, dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      let destval: word = fetch[addr, 32] in
+      let result: word = *src ^ destval in
+      setflags_eor(result);
+      store[addr, 32] <- result
+   ]
+}
+defop EOR_ra src:reg dest:wordlabel {
+   txt = format("eor.l $1, $2", src.txt, dest.lbl),
+   sem = [
+      assert (isD (src));
+      let destval: word = fetch[dest, 32] in
+      let result: word = *src ^ destval in
+      setflags_eor(result);
+      store[dest, 32] <- result
+   ]
+}
+
+(*
+ * eori, mostly like andi
+ *)
+defop EORI_ir srcval:word dest:reg {
+   txt = format("eori.l #$1, $2", srcval.hex, dest.txt),
+   sem = [
+      assert(isD(dest));
+      let result: word = srcval ^ *dest in
+      setflags_eor(result);
+      *dest <- result
+   ]
+}
+defop EORI_im srcval:word dest:reg destoff:halfword {
+   txt = format("eori.l $1, $3($2)", srcval.hex, dest.txt, destoff.hex),
+   sem = [
+      assert (isA (dest));
+      let addr: word = *dest b+ signextend16(destoff) in
+      let destval: word = fetch[addr, 32] in
+      let result: word = srcval ^ destval in
+      setflags_eor(result);
+      store[addr, 32] <- result
+   ]
+}
+defop EORI_ix srcval:word dest:reg destix:reg destoff:byte {
+   txt = format("eori.l $1, $4($2,$3)", srcval.hex, dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert (isA (dest));
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      let destval: word = fetch[addr, 32] in
+      let result: word = srcval ^ destval in
+      setflags_eor(result);
+      store[addr, 32] <- result
+   ]
+}
+defop EORI_ia srcval:word dest:wordlabel {
+   txt = format("eori.l $1, $2", srcval.hex, dest.lbl),
+   sem = [
+      let destval: word = fetch[dest, 32] in
+      let result: word = srcval ^ destval in
+      setflags_eor(result);
+      store[dest, 32] <- result
+   ]
+}
+defop EORI_is srcval:halfword {
+   txt = format("eori.w $1, %sr", srcval.hex),
+   sem = [
+      assert ( *SF == 0b1); (* must be in supervisor mode *)
+      let destval: halfword = readsr() in
+      let result: halfword = srcval ^ destval in
+      writesr(result)
+   ]
+}
+defop EORI_ic srcval:byte {
+   txt = format("eori.b $1, %ccr", srcval.hex),
+   sem = [
+      let destval: byte = readccr() in
+      let result: byte = srcval ^ destval in
+      writeccr(result)
+   ]
+}
+
+(*
+ * exg: exchange registers
+ *)
+defop EXG a:reg b:reg {
+   txt = format("exg $1, $2", a.txt, b.txt),
+   sem = [
+      let aval: word = *a in
+      let bval: word = *b in
+      *a <- bval;
+      *b <- aval
+   ]
+}
+
+(*
+ * ext: sign extend
+ *)
+defop EXT16 r:reg {
+   txt = format("ext.l $1", r.txt),
+   sem = [ *r <- signextend16(bv_to_len(16, *r & 0x0000ffff)) ]
+}
+defop EXT8 r:reg {
+   txt = format("ext.w $1", r.txt),
+   sem = [
+      let lo: word = signextend8(bv_to_len(8, *r & 0x000000ff)) & 0x0000ffff in
+      let hi: word = *r & 0xffff0000 in
+      *r <- hi | lo
+   ]
+}
+
+(*
+ * lea: load effective address
+ *)
+defop LEA_mr src:reg srcoff:halfword dest:reg {
+   txt = format("lea $2($1), $3", src.txt, srcoff.hex, dest.txt),
+   sem = [ *dest <- *src b+ signextend16(srcoff) ]
+}
+defop LEA_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("lea $1, $2", fmt_x(src, srcix, srcoff), fmt_r(dest)),
+   sem = [ *dest <- *src b+ *srcix b+ signextend8(srcoff) ]
+}
+defop LEA_ar src:wordlabel dest:reg {
+   txt = format("lea $1, $2", src.lbl, dest.txt),
+   sem = [ *dest <- src ]
+}
+
+(*
+ * lsl: unsigned left shift
+ * (this appears to differ from asl in whether it signals overflow)
+ *)
+proc setflags_lsl result:word initval:word shiftamt:word =
+   *NF <- if result[31] then 0b1 else 0b0;
+   *ZF <- if result == 0x00000000 then 0b1 else 0b0;
+   *VF <- 0b0;
+   if shiftamt == 0x00000000 then
+      (* XF unaffected *)
+      (*
+       * XXX my book says that CF is unaffected if the shift count is 0,
+       * but it's been crossed out and someone wrote "cleared". I'm going
+       * to trust the correction for now. See also ASL and ASR.
+       *)
+      *CF <- 0b0
+   else
+      let shiftedout:word =
+         if shiftamt b> 0x00000020 then initval
+         else initval >> (0x00000020 b- shiftamt)
+      in
+      *XF <- if shiftedout[0] then 0b1 else 0b0;
+      *CF <- if shiftedout[0] then 0b1 else 0b0
+defop LSL_ir shiftval:4 bit  dest:reg {
+   txt = format("lsl.l #$1, $2", shiftval.dec, dest.txt),
+   sem = [
+      assert(0x0 b< shiftval && shiftval b< 0x9);
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = initval << bv_to_len(32, shiftval) in
+      setflags_lsl(result, initval, bv_to_len(32, shiftval));
+      *dest <- result
+   ]
+}
+defop LSL_rr shiftreg:reg dest:reg {
+   txt = format("lsl.l $1, $2", shiftreg.txt, dest.txt),
+   sem = [
+      assert(isD(shiftreg));
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = initval << *shiftreg in
+      setflags_lsl(result, initval, *shiftreg);
+      *dest <- result
+   ]
+}
+defop LSL_m dest:reg destoff:halfword {
+   txt = format("lsl.l $2($1)", dest.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ signextend16(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = initval << 0x00000001 in
+      setflags_lsl(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop LSL_x dest:reg destix:reg destoff:byte {
+   txt = format("lsl.l $3($1, $2)", dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = initval << 0x00000001 in
+      setflags_lsl(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop LSL_a dest:wordlabel {
+   txt = format("lsl.l $1", dest.lbl),
+   sem = [
+      let initval: word = fetch[dest, 32] in
+      let result: word = initval << 0x00000001 in
+      setflags_lsl(result, initval, 0x00000001);
+      store[dest, 32] <- result
+   ]
+}
+
+(*
+ * lsr (unsigned right shift) has three forms:
+ *   - shift a data register left by 1-8 bits
+ *   - shift a data register left by another data register
+ *   - shift a value in memory left by 1
+ *)
+proc setflags_lsr result:word initval:word shiftamt:word =
+   *NF <- if result[31] then 0b1 else 0b0;
+   *ZF <- if result == 0x00000000 then 0b1 else 0b0;
+   *VF <- 0b0;
+   if shiftamt == 0x00000000 then
+      (* XF unaffected *)
+      (*
+       * XXX my book says that CF is unaffected if the shift count is 0,
+       * but it's been crossed out and someone wrote "cleared". I'm going
+       * to trust the correction for now. See also ASL and ASR.
+       *)
+      *CF <- 0b0
+   else
+      let shiftedout:word =
+         if shiftamt b> 0x00000020 then initval
+         else initval << (0x00000020 b- shiftamt)
+      in
+      *XF <- if shiftedout[31] then 0b1 else 0b0;
+      *CF <- if shiftedout[31] then 0b1 else 0b0
+defop LSR_ir shiftval:4 bit  dest:reg {
+   txt = format("lsr.l #$1, $2", shiftval.dec, dest.txt),
+   sem = [
+      assert(0x0 b< shiftval && shiftval b< 0x9);
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = initval >> bv_to_len(32, shiftval) in
+      setflags_lsr(result, initval, bv_to_len(32, shiftval));
+      *dest <- result
+   ]
+}
+defop LSR_rr shiftreg:reg dest:reg {
+   txt = format("lsr.l $1, $2", shiftreg.txt, dest.txt),
+   sem = [
+      assert(isD(shiftreg));
+      assert(isD(dest));
+      let initval: word = *dest in
+      let result: word = initval >> *shiftreg in
+      setflags_lsr(result, initval, *shiftreg);
+      *dest <- result
+   ]
+}
+defop LSR_m dest:reg destoff:halfword {
+   txt = format("lsr.l $2($1)", dest.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ signextend16(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = initval >> 0x00000001 in
+      setflags_lsr(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop LSR_x dest:reg destix:reg destoff:byte {
+   txt = format("lsr.l $3($1, $2)", dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert(isA(dest));
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      let initval: word = fetch[addr, 32] in
+      let result: word = initval >> 0x00000001 in
+      setflags_lsr(result, initval, 0x00000001);
+      store[addr, 32] <- result
+   ]
+}
+defop LSR_a dest:wordlabel {
+   txt = format("lsr.l $1", dest.lbl),
+   sem = [
+      let initval: word = fetch[dest, 32] in
+      let result: word = initval >> 0x00000001 in
+      setflags_lsr(result, initval, 0x00000001);
+      store[dest, 32] <- result
+   ]
+}
+
+(*
+ * move
+ *
+ * note that technically move-to-address register is a different
+ * instruction (movea) but it looks like we can ignore that above the
+ * assembler.
+ *)
+proc setflags_move (result: word) =
+   (* XF not affected *)
+   *NF <- if result[31] then 0b1 else 0b0;
+   *ZF <- if result == 0x00000000 then 0b1 else 0b0;
+   *VF <- 0b0;
+   *CF <- 0b0
+defop MOVE_ir srcval:word dest:reg {
+   txt = format("move $1, $2", fmt_i(srcval), dest.txt),
+   sem = [
+      setflags_move(srcval);
+      *dest <- srcval
+   ]
+}
+defop MOVE_im srcval:word dest:reg destoff:halfword {
+   txt = format("move #$1, $3($2)", srcval.hex, dest.txt, destoff.hex),
+   sem = [
+      let destaddr: word = *dest b+ signextend16(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_ix srcval:word dest:reg destix:reg destoff:byte {
+   txt = format("move #$1, $4($2, $3)",
+                srcval.hex, dest.txt, destix.txt, destoff.hex),
+   sem = [
+      let destaddr: word = *dest b+ *destix b+ signextend8(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_ia srcval:word destlbl:wordlabel {
+   txt = format("move #$1, $2", srcval.hex, destlbl.lbl),
+   sem = [
+      setflags_move(srcval);
+      store[destlbl, 32] <- srcval
+   ]
+}
+defop MOVE_rr src:reg dest:reg {
+   txt = format("move $1, $2", src.txt, dest.txt),
+   sem = [
+      setflags_move( *src);
+      *dest <- *src
+   ]
+}
+defop MOVE_rm src:reg dest:reg destoff:halfword {
+   txt = format("move $1, $3($2)", src.txt, dest.txt, destoff.hex),
+   sem = [
+      let destaddr: word = *dest b+ signextend16(destoff) in
+      setflags_move( *src);
+      store[destaddr, 32] <- *src
+   ]
+}
+defop MOVE_rx src:reg dest:reg destix:reg destoff:byte {
+   txt = format("move $1, $4($2, $3)",
+                src.txt, dest.txt, destix.txt, destoff.hex),
+   sem = [
+      let destaddr: word = *dest b+ *destix b+ signextend8(destoff) in
+      setflags_move( *src);
+      store[destaddr, 32] <- *src
+   ]
+}
+defop MOVE_ra src:reg destlbl:wordlabel {
+   txt = format("move $1, $2", src.txt, destlbl.lbl),
+   sem = [
+      setflags_move( *src);
+      store[destlbl, 32] <- *src
+   ]
+}
+defop MOVE_mr src:reg srcoff:halfword dest:reg {
+   txt = format("move $2($1), $3", src.txt, srcoff.hex, dest.txt),
+   sem = [
+      let srcaddr: word = *src b+ signextend16(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      setflags_move(srcval);
+      *dest <- srcval
+   ]
+}
+defop MOVE_mm src:reg srcoff:halfword dest:reg destoff:halfword {
+   txt = format("move $2($1), $4($3)",
+                src.txt, srcoff.hex, dest.txt, destoff.hex),
+   sem = [
+      let srcaddr: word = *src b+ signextend16(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      let destaddr: word = *dest b+ signextend16(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_mx src:reg srcoff:halfword dest:reg destix:reg destoff:byte {
+   txt = format("move $2($1), $5($3, $4)",
+                src.txt, srcoff.hex, dest.txt, destix.txt, destoff.hex),
+   sem = [
+      let srcaddr: word = *src b+ signextend16(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      let destaddr: word = *dest b+ *destix b+ signextend8(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_ma src:reg srcoff:halfword destlbl:wordlabel {
+   txt = format("move $2($1), $3", src.txt, srcoff.hex, destlbl.lbl),
+   sem = [
+      let srcaddr: word = *src b+ signextend16(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      setflags_move(srcval);
+      store[destlbl, 32] <- srcval
+   ]
+}
+defop MOVE_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("move $3($1, $2), $4",
+                src.txt, srcix.txt, srcoff.hex, dest.txt),
+   sem = [
+      let srcaddr: word = *src b+ *srcix b+ signextend8(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      setflags_move(srcval);
+      *dest <- srcval
+   ]
+}
+defop MOVE_xm src:reg srcix:reg srcoff:byte dest:reg destoff:halfword {
+   txt = format("move $3($1, $2), $5($4)",
+                src.txt, srcix.txt, srcoff.hex, dest.txt, destoff.hex),
+   sem = [
+      let srcaddr: word = *src b+ *srcix b+ signextend8(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      let destaddr: word = *dest b+ signextend16(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_xx src:reg srcix:reg srcoff:byte dest:reg destix:reg destoff:byte {
+   txt = format("move $3($1, $2), $6($4, $5)", src.txt, srcix.txt, srcoff.hex,
+                dest.txt, destix.txt, destoff.hex),
+   sem = [
+      let srcaddr: word = *src b+ *srcix b+ signextend8(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      let destaddr: word = *dest b+ *destix b+ signextend8(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_xa src:reg srcix:reg srcoff:byte destlbl:wordlabel {
+   txt = format("move $3($1, $2), $4",
+                src.txt, srcix.txt, srcoff.hex, destlbl.lbl),
+   sem = [
+      let srcaddr: word = *src b+ *srcix b+ signextend8(srcoff) in
+      let srcval: word = fetch[srcaddr, 32] in
+      setflags_move(srcval);
+      store[destlbl, 32] <- srcval
+   ]
+}
+defop MOVE_ar srclbl:wordlabel dest:reg {
+   txt = format("move $1, $2", srclbl.lbl, dest.txt),
+   sem = [
+      let srcval: word = fetch[srclbl, 32] in
+      setflags_move(srcval);
+      *dest <- srcval
+   ]
+}
+defop MOVE_am srclbl:wordlabel dest:reg destoff:halfword {
+   txt = format("move $1, $3($2)", srclbl.lbl, dest.txt, destoff.hex),
+   sem = [
+      let srcval: word = fetch[srclbl, 32] in
+      let destaddr: word = *dest b+ signextend16(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_ax srclbl:wordlabel dest:reg destix:reg destoff:byte {
+   txt = format("move $1, $4($2, $3)", srclbl.lbl,
+                dest.txt, destix.txt, destoff.hex),
+   sem = [
+      let srcval: word = fetch[srclbl, 32] in
+      let destaddr: word = *dest b+ *destix b+ signextend8(destoff) in
+      setflags_move(srcval);
+      store[destaddr, 32] <- srcval
+   ]
+}
+defop MOVE_aa srclbl:wordlabel destlbl:wordlabel {
+   txt = format("move $1, $2", srclbl.lbl, destlbl.lbl),
+   sem = [
+      let srcval: word = fetch[srclbl, 32] in
+      setflags_move(srcval);
+      store[destlbl, 32] <- srcval
+   ]
+}
+
+(*
+ * move of the status register
+ *)
+
+defop MOVE_is srcval:halfword {
+   txt = format("move #$1, %sr", srcval.hex),
+   sem = [ writesr(srcval) ]
+}
+defop MOVE_ic srcval:byte {
+   txt = format("move #$1, %ccr", srcval.hex),
+   sem = [ writeccr(srcval) ]
+}
+defop MOVE_rs src:reg {
+   txt = format("move $1, %sr", src.txt),
+   sem = [
+      assert(isD(src));
+      writesr(bv_to_len(16, *src))
+   ]
+}
+defop MOVE_rc src:reg {
+   txt = format("move $1, %ccr", src.txt),
+   sem = [
+      assert(isD(src));
+      writesr(bv_to_len(16, *src))
+   ]
+}
+defop MOVE_ms src:reg srcoff:halfword {
+   txt = format("move $1, %sr", fmt_m(src, srcoff)),
+   sem = [ writesr(get_m16(src, srcoff)) ]
+}
+defop MOVE_mc src:reg srcoff:halfword {
+   txt = format("move $1, %ccr", fmt_m(src, srcoff)),
+   sem = [ writeccr(get_m8(src, srcoff)) ]
+}
+defop MOVE_xs src:reg srcix:reg srcoff:byte {
+   txt = format("move $1, %sr", fmt_x(src, srcix, srcoff)),
+   sem = [ writesr(get_x16(src, srcix, srcoff)) ]
+}
+defop MOVE_xc src:reg srcix:reg srcoff:byte {
+   txt = format("move $1, %ccr", fmt_x(src, srcix, srcoff)),
+   sem = [ writeccr(get_x8(src, srcix, srcoff)) ]
+}
+defop MOVE_as src:wordlabel {
+   txt = format("move $1, %sr", fmt_a(src)),
+   sem = [ writesr(get_a16(src)) ]
+}
+defop MOVE_ac src:wordlabel {
+   txt = format("move $1, %ccr", fmt_a(src)),
+   sem = [ writeccr(get_a8(src)) ]
+}
+
+(*
+ * according to my book you can't move from %ccr, only %sr
+ *)
+defop MOVE_sr dest:reg {
+   txt = format("move %sr, $1", dest.txt),
+   sem = [
+      assert ( *SF == 0b1); (* must be in supervisor mode *)
+      *dest <- bv_to_len(32, readsr())
+   ]
+}
+defop MOVE_sm dest:reg destoff:halfword {
+   txt = format("move %sr, $2($1)", dest.txt, destoff.hex),
+   sem = [
+      assert ( *SF == 0b1); (* must be in supervisor mode *)
+      let addr: word = *dest b+ signextend16(destoff) in
+      store[addr, 16] <- readsr()
+   ]
+}
+defop MOVE_sx dest:reg destix:reg destoff:byte {
+   txt = format("move %sr, $3($1, $2)", dest.txt, destix.txt, destoff.hex),
+   sem = [
+      assert ( *SF == 0b1); (* must be in supervisor mode *)
+      let addr: word = *dest b+ *destix b+ signextend8(destoff) in
+      store[addr, 16] <- readsr()
+   ]
+}
+defop MOVE_sa destlbl:wordlabel {
+   txt = format("move %sr, $1", destlbl.lbl),
+   sem = [
+      assert ( *SF == 0b1); (* must be in supervisor mode *)
+      store[destlbl, 16] <- readsr()
+   ]
+}
+
+(*
+ * and there's a special instruction for moving to %usp
+ * XXX: leaving this disabled since we don't have %usp in the model
+ * (and if we add it, we need a lot more assertions about registers
+ * since %usp isn't generally accessible)
+ *)
+(*defop MOVE_ru src:reg {
+   txt = format("move $1, %usp", src.txt),
+   sem = [
+      assert(isA(src));
+      *usp <- *src
+   ]
+}*)
+(*defop MOVE_ur dest:reg {
+   txt = format("move %usp, $1", dest.txt),
+   sem = [
+      assert(isA(dest));
+      *dest <- *usp
+   ]
+}*)
+
+(*
+ * skip movem, which is load/store of multiple registers at once
+ *)
+
+(*
+ * skip movep, for now anyway, which is for sending to I/O registers
+ * (this is the kind of thing we need to be able to do though)
+ *)
+
+(*
+ * skip moveq, which is a short encoding of moving small immediates
+ * into data registers; assume the assembler will handle it
+ *)
+
+(*
+ * skip muls and mulu for now (they're 16-bit * 16-bit to 32-bit multiply)
+ *)
+
+(*
+ * neg (negate)
+ *)
+proc setflags_neg result:word srcval:word =
+   *XF <- if result == 0x00000000 then 0b0 else 0b1;
+   *NF <- if result[31] then 0b1 else 0b0;
+   *ZF <- if result == 0x00000000 then 0b1 else 0b0;
+   *VF <- if srcval == 0x80000000 then 0b1 else 0b0;
+   *CF <- if result == 0x00000000 then 0b0 else 0b1
+defop NEG_r r:reg {
+   txt = format("neg.l $1", r.txt),
+   sem = [
+      assert(isD(r));
+      let srcval: word = get_r(r) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_neg(result, srcval);
+      put_r(r, result)
+   ]
+}
+defop NEG_m r:reg off:halfword {
+   txt = format("neg.l $2($1)", r.txt, off.hex),
+   sem = [
+      let srcval: word = get_m(r, off) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_neg(result, srcval);
+      put_m(r, off, result)
+   ]
+}
+defop NEG_x r:reg ix:reg off:byte {
+   txt = format("neg.l $3($1, $2)", r.txt, ix.txt, off.hex),
+   sem = [
+      let srcval: word = get_x(r, ix, off) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_neg(result, srcval);
+      put_x(r, ix, off, result)
+   ]
+}
+defop NEG_a a:wordlabel {
+   txt = format("neg.l $1", a.lbl),
+   sem = [
+      let srcval: word = get_a(a) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_neg(result, srcval);
+      put_a(a, result)
+   ]
+}
+
+(*
+ * negx is akin to addx
+ *)
+proc setflags_negx result:word srcval:word =
+   *XF <- if result == 0x00000000 then 0b0 else 0b1;
+   *NF <- if result[31] then 0b1 else 0b0;
+   *ZF <- if result == 0x00000000 then *ZF else 0b0;
+   *VF <- if srcval == 0x80000000 then 0b1 else 0b0;
+   *CF <- if result == 0x00000000 then 0b0 else 0b1
+defop NEGX_r r:reg {
+   txt = format("negx.l $1", r.txt),
+   sem = [
+      assert(isD(r));
+      let srcval: word = get_r(r) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_negx(result, srcval);
+      put_r(r, result)
+   ]
+}
+defop NEGX_m r:reg off:halfword {
+   txt = format("negx.l $2($1)", r.txt, off.hex),
+   sem = [
+      let srcval: word = get_m(r, off) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_negx(result, srcval);
+      put_m(r, off, result)
+   ]
+}
+defop NEGX_x r:reg ix:reg off:byte {
+   txt = format("negx.l $3($1, $2)", r.txt, ix.txt, off.hex),
+   sem = [
+      let srcval: word = get_x(r, ix, off) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_negx(result, srcval);
+      put_x(r, ix, off, result)
+   ]
+}
+defop NEGX_a a:wordlabel {
+   txt = format("negx.l $1", a.lbl),
+   sem = [
+      let srcval: word = get_a(a) in
+      let result: word = 0x00000000 b- srcval in
+      setflags_negx(result, srcval);
+      put_a(a, result)
+   ]
+}
+
+(*
+ * bitwise not
+ *)
+proc setflags_not (r:word) =
+   (* XF is not changed *)
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then 0b1 else 0b0;
+   *VF <- 0b0;
+   *CF <- 0b0
+defop NOT_r r:reg {
+   txt = format("not.l $1", r.txt),
+   sem = [
+      let result: word = ~*r in
+      setflags_not(result);
+      *r <- result
+   ]
+}
+defop NOT_m r:reg off:halfword {
+   txt = format("not.l $2($1)", r.txt, off.hex),
+   sem = [
+      let addr: word = *r b+ signextend16(off) in
+      let result: word = ~fetch[addr, 32] in
+      setflags_not(result);
+      store[addr, 32] <- result
+   ]
+}
+defop NOT_x r:reg ix:reg off:byte {
+   txt = format("not.l $3($1, $2)", r.txt, ix.txt, off.hex),
+   sem = [
+      let addr: word = *r b+ *ix b+ signextend8(off) in
+      let result: word = ~fetch[addr, 32] in
+      setflags_not(result);
+      store[addr, 32] <- result
+   ]
+}
+defop NOT_a a:wordlabel {
+   txt = format("not.l $1", a.lbl),
+   sem = [
+      let result: word = ~fetch[a, 32] in
+      setflags_not(result);
+      store[a, 32] <- result
+   ]
+}
+
+(*
+ * or
+ * (same combinations as and)
+ *)
+proc setflags_or (r:word) =
+   (* XF is not changed *)
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then 0b1 else 0b0;
+   *VF <- 0b0;
+   *CF <- 0b0
+defop OR_ir srcval:word dest:reg {
+   txt = format("or.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let destval: word = get_r(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_r(dest, result)
+   ]
+}
+defop OR_rr src:reg dest:reg {
+   txt = format("or.l $1, $2", fmt_r(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_r(dest, result)
+   ]
+}
+defop OR_mr src:reg srcoff:halfword dest:reg {
+   txt = format("or.l $1, $2", fmt_m(src, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_m(src, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_r(dest, result)
+   ]
+}
+defop OR_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("or.l $1, $2", fmt_x(src, srcix, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_x(src, srcix, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_r(dest, result)
+   ]
+}
+defop OR_ar src:wordlabel dest:reg {
+   txt = format("or.l $1, $2", fmt_a(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_a(src) in
+      let destval: word = get_r(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_r(dest, result)
+   ]
+}
+defop OR_rm src:reg dest:reg destoff:halfword {
+   txt = format("or.l $1, $2", fmt_r(src), fmt_m(dest, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_m(dest, destoff) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_m(dest, destoff, result)
+   ]
+}
+defop OR_rx src:reg dest:reg destix:reg destoff:byte {
+   txt = format("or.l $1, $2", fmt_r(src), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop OR_ra src:reg dest:wordlabel {
+   txt = format("or.l $1, $2", fmt_r(src), fmt_a(dest)),
+   sem = [
+      assert (isD (src));
+      let srcval: word = get_r(src) in
+      let destval: word = get_a(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_a(dest, result)
+   ]
+}
+
+(*
+ * ori, or with immediate src
+ *)
+defop ORI_ir srcval:word dest:reg {
+   txt = format("ori.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert(isD(dest));
+      let destval: word = get_r(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_r(dest, result)
+   ]
+}
+defop ORI_im srcval:word dest:reg destoff:halfword {
+   txt = format("ori.l $1, $2", fmt_i(srcval), fmt_m(dest, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_m(dest, destoff) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_m(dest, destoff, result)
+   ]
+}
+defop ORI_ix srcval:word dest:reg destix:reg destoff:byte {
+   txt = format("ori.l $1, $2", fmt_i(srcval), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop ORI_ia srcval:word dest:wordlabel {
+   txt = format("ori.l $1, $2", fmt_i(srcval), fmt_a(dest)),
+   sem = [
+      let destval: word = get_a(dest) in
+      let result: word = srcval | destval in
+      setflags_or(result);
+      put_a(dest, result)
+   ]
+}
+defop ORI_is srcval:halfword {
+   txt = format("ori.w $1, %sr", srcval.hex),
+   sem = [
+      assert ( *SF == 0b1); (* must be in supervisor mode *)
+      let destval: halfword = readsr() in
+      let result: halfword = srcval | destval in
+      writesr(result)
+   ]
+}
+defop ORI_ic srcval:byte {
+   txt = format("ori.b $1, %ccr", srcval.hex),
+   sem = [
+      let destval: byte = readccr() in
+      let result: byte = srcval | destval in
+      writeccr(result)
+   ]
+}
+
+(*
+ * pea: push effective address
+ *)
+proc pushl (x:word) =
+   *A7 <- *A7 b- 0x00000004;
+   store[*A7, 32] <- x
+defop PEA_m src:reg srcoff:halfword dest:reg {
+   txt = format("pea $2($1), $3", src.txt, srcoff.hex, dest.txt),
+   sem = [ pushl( *src b+ signextend16(srcoff)) ]
+}
+defop PEA_x src:reg srcx:reg srcoff:byte dest:reg {
+   txt = format("pea $3($1, $2), $4", src.txt, srcx.txt, srcoff.hex, dest.txt),
+   sem = [ pushl( *src b+ *srcx b+ signextend8(srcoff)) ]
+}
+defop PEA_a src:wordlabel dest:reg {
+   txt = format("pea $1, $2", src.lbl, dest.txt),
+   sem = [ pushl(src) ]
+}
+
+(*
+ * skip ROL, ROR, ROXL, and ROXL as rotate really isn't a very
+ * useful operation.
+ *)
+
+(*
+ * conditional set
+ *
+ * I'm going to punt this for now because (a) there are a zillion
+ * combinations (rmxa versions for 16 different conditions) and
+ * they only set byte values.
+ *
+ * Well, I think we'll do just the register ones.
+ *)
+proc setbyte dest:reg cond:bool =
+   let hi: word = *dest & 0xffffff00 in
+   let lo: word = if cond then 0x000000ff else 0x00000000 in
+   *dest <- hi | lo
+defop SCC_r dest:reg {
+   txt = format("scc $1", dest.txt),
+   sem = [ setbyte(dest, *CF == 0b0) ]
+}
+defop SCS_r dest:reg {
+   txt = format("scs $1", dest.txt),
+   sem = [ setbyte(dest, *CF == 0b1) ]
+}
+defop SEQ_r dest:reg {
+   txt = format("seq $1", dest.txt),
+   sem = [ setbyte(dest, *ZF == 0b0) ]
+}
+defop SGE_r dest:reg {
+   txt = format("sge $1", dest.txt),
+   sem = [ setbyte(dest, *NF == *VF) ]
+}
+defop SGT_r dest:reg {
+   txt = format("sgt $1", dest.txt),
+   sem = [ setbyte(dest, *ZF == 0b0 && *NF == *VF) ]
+}
+defop SHI_r dest:reg {
+   txt = format("shi $1", dest.txt),
+   sem = [ setbyte(dest, *CF == 0b0 && *ZF == 0b0) ]
+}
+defop SLE_r dest:reg {
+   txt = format("sle $1", dest.txt),
+   sem = [ setbyte(dest, *ZF == 0b1 || *NF != *VF) ]
+}
+defop SLS_r dest:reg {
+   txt = format("sls $1", dest.txt),
+   sem = [ setbyte(dest, *CF == 0b1 || *ZF == 0b1) ]
+}
+defop SLT_r dest:reg {
+   txt = format("slt $1", dest.txt),
+   sem = [ setbyte(dest, *NF != *VF) ]
+}
+defop SMI_r dest:reg {
+   txt = format("smi $1", dest.txt),
+   sem = [ setbyte(dest, *NF == 0b1) ]
+}
+defop SNE_r dest:reg {
+   txt = format("sne $1", dest.txt),
+   sem = [ setbyte(dest, *ZF == 0b0) ]
+}
+defop SPL_r dest:reg {
+   txt = format("spl $1", dest.txt),
+   sem = [ setbyte(dest, *NF == 0b0) ]
+}
+defop SVC_r dest:reg {
+   txt = format("svc $1", dest.txt),
+   sem = [ setbyte(dest, *VF == 0b0) ]
+}
+defop SVS_r dest:reg {
+   txt = format("svs $1", dest.txt),
+   sem = [ setbyte(dest, *VF == 0b1) ]
+}
+defop SF_r dest:reg {
+   txt = format("sf $1", dest.txt),
+   sem = [ setbyte(dest, false) ]
+}
+defop ST_r dest:reg {
+   txt = format("st $1", dest.txt),
+   sem = [ setbyte(dest, true) ]
+}
+
+(*
+ * sub
+ * same forms as add
+ *
+ * note though that sub r1, r2 subtracts r1 from r2...
+ *)
+proc setflags_sub (r:word) a:word b:word =
+   (* sub overflows if the corresponding add does *)
+   let overflow: bool = !a[31] != b[31] && r[31] != !a[31] in
+
+   (* overflow is true if r[31] <> carry *)
+   let carry: bool = if overflow then !r[31] else r[31] in
+
+   *XF <- if carry then 0b1 else 0b0;
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then 0b1 else 0b0;
+   *VF <- if overflow then 0b1 else 0b0;
+   *CF <- if carry then 0b1 else 0b0
+defop SUB_ir srcval:word dest:reg {
+   txt = format("sub.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let destval:word = get_r(dest) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop SUB_rr src:reg dest:reg {
+   txt = format("sub.l $1, $2", fmt_r(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_r(dest) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop SUB_mr src:reg srcoff:halfword dest:reg {
+   txt = format("sub.l $1, $2", fmt_m(src, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_m(src, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop SUB_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("sub.l $1, $2", fmt_x(src, srcix, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isD (dest));
+      let srcval: word = get_x(src, srcix, srcoff) in
+      let destval: word = get_r(dest) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop SUB_ar src:wordlabel dest:reg {
+   txt = format("sub.l $1, $2", fmt_a(src), fmt_r(dest)),
+   sem = [
+      assert (isD (dest));
+      let srcval: word = get_a(src) in
+      let destval: word = get_r(dest) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop SUB_rm src:reg dest:reg destoff:halfword {
+   txt = format("sub.l $1, $2", fmt_r(src), fmt_m(dest, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_m(dest, destoff) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_m(dest, destoff, result)
+   ]
+}
+defop SUB_rx src:reg dest:reg destix:reg destoff:byte {
+   txt = format("sub.l $1, $2", fmt_r(src), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isD (src));
+      assert (isA (dest));
+      let srcval: word = get_r(src) in
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop SUB_ra src:reg dest:wordlabel {
+   txt = format("sub.l $1, $2", fmt_r(src), fmt_a(dest)),
+   sem = [
+      assert (isD (src));
+      let srcval: word = get_r(src) in
+      let destval: word = fetch[dest, 32] in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_a(dest, result)
+   ]
+}
+
+(*
+ * suba
+ * same forms as adda
+ *)
+defop SUBA_ir srcval:word dest:reg {
+   txt = format("suba $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      assert (isA (dest));
+      *dest <- srcval b+ *dest
+   ]
+}
+defop SUBA_rr src:reg dest:reg {
+   txt = format("suba $1, $2", fmt_r(src), fmt_r(dest)),
+   sem = [
+      assert (isA (dest));
+      *dest <- *src b+ *dest
+   ]
+}
+defop SUBA_mr src:reg srcoff:halfword dest:reg {
+   txt = format("suba $1, $2", fmt_m(src, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isA (dest));
+      *dest <- get_m(src, srcoff) b+ *dest
+   ]
+}
+defop SUBA_xr src:reg srcix:reg srcoff:byte dest:reg {
+   txt = format("suba $1, $2", fmt_x(src, srcix, srcoff), fmt_r(dest)),
+   sem = [
+      assert (isA (src));
+      assert (isA (dest));
+      *dest <- get_x(src, srcix, srcoff) b+ *dest
+   ]
+}
+defop SUBA_ar src:wordlabel dest:reg {
+   txt = format("suba $1, $2", fmt_a(src), fmt_r(dest)),
+   sem = [
+      assert (isA (dest));
+      *dest <- get_a(src) b+ *dest
+   ]
+}
+
+(*
+ * subi
+ * same forms as addi
+ *)
+defop SUBI_ir srcval:word dest:reg {
+   txt = format("subi.l $1, $2", fmt_i(srcval), fmt_r(dest)),
+   sem = [
+      let destval: word = get_r(dest) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_r(dest, result)
+   ]
+}
+defop SUBI_im srcval:word dest:reg destoff:halfword {
+   txt = format("subi.l $1, $2", fmt_i(srcval), fmt_m(dest, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_m(dest, destoff) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_m(dest, destoff, result)
+   ]
+}
+defop SUBI_ix srcval:word dest:reg destix:reg destoff:byte {
+   txt = format("subi.l $1, $2", fmt_i(srcval), fmt_x(dest, destix, destoff)),
+   sem = [
+      assert (isA (dest));
+      let destval: word = get_x(dest, destix, destoff) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_x(dest, destix, destoff, result)
+   ]
+}
+defop SUBI_ia srcval:word dest:wordlabel {
+   txt = format("subi.l $1, $2", fmt_i(srcval), fmt_a(dest)),
+   sem = [
+      let destval: word = get_a(dest) in
+      let result: word = destval b- srcval in
+      setflags_sub(result, srcval, destval);
+      put_a(dest, result)
+   ]
+}
+
+(*
+ * subq is like addq; skip it
+ *)
+
+(*
+ * subx, like addx
+ *)
+proc setflags_subx (r:word) a:word b:word =
+   (* same as setflags_sub, except for the ZF behavior *)
+
+   let overflow: bool = !a[31] != b[31] && r[31] != !a[31] in
+   let carry: bool = if overflow then !r[31] else r[31] in
+
+   *XF <- if carry then 0b1 else 0b0;
+   *NF <- if r[31] then 0b1 else 0b0;
+   *ZF <- if (r == 0x00000000) then *ZF else 0b0;
+   *VF <- if overflow then 0b1 else 0b0;
+   *CF <- if carry then 0b1 else 0b0
+defop SUBX_rr src:reg dest:reg {
+   txt = format("subx.l $1, $2", src.txt, dest.txt),
+   sem = [
+      assert(isD(src) && isD(dest));
+      let result: word = *dest b- *src in
+      setflags_subx(result, *src, *dest);
+      *dest <- result
+   ]
+}
+defop SUBX_mm src:reg dest:reg {
+   txt = format("subx.l -($1), -($2)", src.txt, dest.txt),
+   sem = [
+      assert(isA(src) && isA(dest));
+      *src <- *src b- 0x00000004;
+      *dest <- *dest b- 0x00000004;
+      let srcval: word = fetch[*src, 32] in
+      let destval: word = fetch[*dest, 32] in
+      let result: word = destval b- srcval in
+      setflags_subx(result, srcval, destval);
+      store[*dest, 32] <- result
+   ]
+}
+
+(*
+ * swap: exchange halfwords
+ *)
+defop SWAP r:reg {
+   txt = format("swap $1", r.txt),
+   sem = [
+      assert(isD(r));
+      let hi: word = ( *r & 0x0000ffff) << 0x00000010 in
+      let lo: word = ( *r & 0xffff0000) >> 0x00000010 in
+      *r <- hi | lo
+   ]
+}
+
+(*
+ * tas (test-and-set) is not useful for general operations; skip it
+ *)
+
+(*
+ * trap (system call) we don't need in here
+ *)
+
+(*
+ * trapv (raise exception on overflow) we can't represent
+ *)
+
+(*
+ * tst: set the N and Z flags
+ *)
+proc setflags_tst(x: word) =
+   (* XF not affected *)
+   *NF <- if x[31] then 0b1 else 0b0;
+   *ZF <- if x == 0x00000000 then 0b1 else 0b0;
+   *VF <- 0b0;
+   *CF <- 0b0
+defop TST_r r:reg {
+   txt = format("tst.l $1", fmt_r(r)),
+   sem = [ setflags_tst(get_r(r)) ]
+}
+defop TST_m r:reg off:halfword {
+   txt = format("tst.l $1", fmt_m(r, off)),
+   sem = [ setflags_tst(get_m(r, off)) ]
+}
+defop TST_x r:reg ix:reg off:byte {
+   txt = format("tst.l $1", fmt_x(r, ix, off)),
+   sem = [ setflags_tst(get_x(r, ix, off)) ]
+}
+defop TST_a a:wordlabel {
+   txt = format("tst.l $1", fmt_a(a)),
+   sem = [ setflags_tst(get_a(a)) ]
+}
+

@@ -1,0 +1,59 @@
+
+LDR R0 R1 0x0
+LDR R2 R3 0x0
+
+R1 and R3 store pointers
+
+CASP
+region dispatcher: 32 bit 20 len 32 ref
+pre
+	*R1 = [dispatcher, 0]
+	*R3 = [dispatcher, 10]
+
+post
+	*R0 = read[ *R1]
+	*R2 = read[ *R3]
+
+ALE
+region dispatcher: wordsz bit 20 len wordsz ref
+pre	
+	get(idx0reg) = [dispatcher, 0]
+	get(idx10reg) = [dispatcher, 10]
+	//isptr(memget(..))	
+	//isptr(memget(..))
+post
+	get(dispreg) = memget(get(idx0reg))
+	get(areareg) = memget(get(idx10reg))
+
+
+CASP with word
+region dispatcher: 32 bit 20 len 32 ref
+pre
+	*R1 = [dispatcher, 0]
+	*R3 = [dispatcher, 10]
+
+post
+	let idx0 = if isptr( *R1) then *R1 else assert(F) in
+	let idx10 = if isptr( *R3) then *R3 else assert(F) in
+	*R0 = read[idx0]
+	*R2 = read[idx10]
+
+ALE with word
+region dispatcher: wordsz bit 20 len wordsz ref
+pre	
+	get(idx0reg) = Ptr [dispatcher, 0]
+	get(idx10reg) = Ptr [dispatcher, 10]
+	//isptr(memget(..))	
+	//isptr(memget(..))
+post
+	let idx0 = match get(idx0reg) with
+	| Ptr p -> p
+	| Vec c -> NOOO
+	in	
+	get(dispreg) = memget(idx0);
+
+	let idx10 = match get(idx10reg) with
+	| Ptr p -> p
+	| Vec c -> NOOO
+	in	
+	get(areareg) = memget(idx10)

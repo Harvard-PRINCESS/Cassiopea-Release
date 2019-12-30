@@ -1,0 +1,94 @@
+(********** alewife mappings **********)
+module disp_check_disabled {
+	letstate Mem: 32 bit 1 len 32 ref memory
+	let outreg: gpreg = r4
+	let dispreg: gpreg = r28
+
+	def disp_disabled -> word = [Mem, 0]
+	def disabled_flgT -> bool = ( *r2 == 0x00000000)
+	def disabled_flgF -> bool = ( *r2 == 0x00000001)
+	def disabled_rescheck rreg: gpreg rbv: word -> bool = (rbv == *rreg)
+	reg-modify: r2
+}
+
+module disp_check_low {
+	letstate Mem: 32 bit 1 len 32 ref memory
+	let outreg: gpreg = r4
+	let pcreg: gpreg = r5
+	let dispreg: gpreg = r28
+
+	def disp_crit_low -> word = [Mem, 0] (* 96 *)
+	def disabled_flgF -> bool = ( *r2 == 0x00000001)
+	def critlow_check critbv: word pcbv: word -> bool =
+		(* (disp->crit_pc_lo <= pc), will check high, otherwise, move 0 *)
+		! (pcbv b< critbv)
+	def critlow_flgT -> bool = ( *r2 == 0x00000000)
+	def critlow_flgF -> bool = ( *r2 == 0x00000001)
+	def critlow_resT resr: gpreg contw: word -> bool = *resr == contw
+	def critlow_resF resr: gpreg contw: word -> bool = *resr == 0x00000000
+	reg-modify: r2 r3
+}
+
+module disp_check_high {
+	letstate Mem: 32 bit 1 len 32 ref memory
+	let outreg: gpreg = r4
+	let pcreg: gpreg = r5
+	let dispreg: gpreg = r28
+
+	def disp_crit_high -> word = [Mem, 0] (* OFFSETOF_DISP_CRIT_PC_HIGH = 100 *)
+	def critlow_flgT -> bool = ( *r2 == 0x00000000)
+	def crithigh_check critbv: word pcbv: word -> bool =
+		(* (pc < disp->crit_pc_hi), move 1, otherwise move 0 *)
+		(pcbv b< critbv)
+	def crithigh_flgT -> bool = true
+	def crithigh_flgF -> bool = true
+	def crithigh_resT resr: gpreg -> bool = *resr == 0x00000001
+	def crithigh_resF resr: gpreg -> bool = *resr == 0x00000000
+	reg-modify: r2
+}
+
+module disp_set_area {
+	let areareg: gpreg = r4
+	let outreg: gpreg = r4
+	let dispreg: gpreg = r28
+
+	def enabled_flag -> bool = true
+	def disabled_flag -> bool = true
+
+	(* OFFSETOF_DISP_ENABLED_AREA *)
+	def enabled_area contw: word -> word = contw b+ 0x00000005
+
+	(* OFFSETOF_DISP_DISABLED_AREA*)
+	def disabled_area contw: word -> word = contw b+ 0x00000010
+	reg-modify: r2 r5
+}
+
+module initial_stack {
+	letstate BASE: 32 bit 4 len 32 ref memory
+	let stackreg: gpreg = r29
+	let basereg: gpreg = r4
+	let kernel_stack: word = 0x00000000
+	let kernel_stack_size: word = 0x00000008
+	let STACKLEN: int = 4
+	def check_base base: word -> bool = base == [BASE, 0]
+	def get_stack base: word stack_offset: word -> word = 
+		let addr: word = base b+ stack_offset in
+		fetch[addr, 32]
+}
+
+module get_disp {
+	letstate BASE: 32 bit 4 len 32 ref memory
+	letstate dcb_struct: 32 bit 1 len 32 ref memory
+	let basereg: gpreg = r4
+	let dispreg: gpreg = r28
+	let dcb_current_idx: word = 0x00000000
+	let dcb_disp: word = 0x00000008
+	let DCBLEN: int = 4
+	def check_base base: word dcb_offset: word -> bool = 
+		let addr: word = base b+ dcb_offset in
+		(base == [BASE, 0]) && (fetch [ addr, 32 ] == [dcb_struct, 0])
+	def get_dcb base: word dcb_offset: word -> word = 
+		let addr: word = base b+ dcb_offset in
+		fetch [fetch [ addr, 32 ], 32]
+	def get_disp addr: word -> word = fetch [ addr, 32 ]
+}

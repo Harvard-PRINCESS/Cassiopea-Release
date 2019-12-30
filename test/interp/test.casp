@@ -1,0 +1,1062 @@
+(* Source: https://www.scss.tcd.ie/~waldroj/3d1/arm_arm.pdf *)
+
+type word = 32 bit
+type halfword = 16 bit
+type doubleword = 64 bit
+type byte = 8 bit
+type register = word loc
+type doubleregister = doubleword loc
+type cond_field = 4 bit
+type rotate_imm4 = 4 bit
+type imm8 = 8 bit
+type imm12 = 12 bit
+type imm5 = 5 bit
+
+(*CPSR current program status register*)
+letstate CPSR: register
+(*SPSR saved program status register*)
+letstate SPSR: register
+(* unprivileged (user mode) registers *)
+(*unbanked register*)
+letstate R0: register               (* first function argument *)
+letstate R1: register               (* second function argument *)
+letstate R2: register               (* third function argument *)
+letstate R3: register               (* fourth function argument *)
+letstate R4: register               (* register variable *)
+letstate R5: register               (* register variable *)
+letstate R6: register               (* register variable *)
+letstate R7: register               (* register variable *)
+(*banked register*)
+letstate R8: register               (* register variable *)
+letstate R9: register
+letstate R10: register
+letstate R11: register
+letstate R12: register
+letstate R13: register              (* stack pointer *)
+letstate R14: register              (* link register *)
+letstate PC: register               (* pc *)
+(*supervisor mode*)
+letstate R13_svc: register
+letstate R14_svc: register
+
+let flagreg: register = CPSR
+
+let R0.txt = "r0"
+let R1.txt = "r1"
+let R2.txt = "r2"
+let R3.txt = "r3"
+let R4.txt = "r4"
+let R5.txt = "r5"
+let R6.txt = "r6"
+let R7.txt = "r7"
+let R8.txt = "r8"
+let R9.txt = "r9"
+let R10.txt = "r10"
+let R11.txt = "r11"
+let R12.txt = "r12"
+let R13.txt = "sp"
+let R14.txt = "lr"
+let PC.txt = "pc"
+let CPSR.txt = "cpsr"
+let SPSR.txt = "spsr"
+
+def arm32_wordtoint bv:word -> int =
+	bv_to_uint(bv)
+
+def arm32_inttoword i:int -> word =
+	uint_to_bv_l(32, i)
+
+def arm32_checkcond op: cond_field -> bool = 
+	let cpsr: word = *CPSR in
+	let N_bit: bool = cpsr[31] in
+	let Z_bit: bool = cpsr[30] in
+	let C_bit: bool = cpsr[29] in
+	let V_bit: bool = cpsr[28] in
+	let not_Z: bool = !Z_bit in
+	let C_not_Z: bool = C_bit && not_Z in
+	let N_eq_V: bool = N_bit == V_bit in	
+	let not_Z_N_eq_V: bool = not_Z && N_eq_V in
+
+	switch op: cond_field with 
+		case 0b0000 -> Z_bit? true: false
+		case 0b0001 -> Z_bit? false: true
+		case 0b0010 -> C_bit? true: false
+		case 0b0011 -> C_bit? false: true
+		case 0b0100 -> N_bit? true: false
+		case 0b0101 -> N_bit? false: true
+		case 0b0110 -> V_bit? true: false
+		case 0b0111 -> V_bit? false: true
+		case 0b1000 -> C_not_Z? true: false
+		case 0b1001 -> C_not_Z? false: true
+		case 0b1010 -> N_eq_V? true: false
+		case 0b1011 -> N_eq_V? false: true
+		case 0b1100 -> not_Z_N_eq_V? true: false
+		case 0b1101 -> not_Z_N_eq_V? false: true
+		case 0b1110 -> true
+		case _ -> true
+	end 
+
+def arm32_BorrowFrom op1: word op2: word -> bool =
+    let op1_int: int = arm32_wordtoint(op1) in
+    let op2_int: int = arm32_wordtoint(op2) in
+    let out: int = op1_int - op2_int in
+    out < 0
+
+def arm32_CarryFrom op1: word op2: word -> bool =
+    let op1_int: int = arm32_wordtoint(op1) in
+    let op2_int: int = arm32_wordtoint(op2) in
+    let out: int = op1_int + op2_int in
+    let maxbv: word = 0xFFFFFFFF in
+    let maxint: int = arm32_wordtoint(maxbv) in
+    out > maxint
+
+def arm32_OverflowFromSub op1: word op2: word out: word -> bool =
+    let sign1: bool = op1[31] in
+    let sign2: bool = op2[31] in
+    let signout: bool = out[31] in
+    let diff_opsign: bool = sign1 != sign2 in
+    let diff_resign: bool = signout != sign1 in
+    diff_opsign && diff_resign
+
+def arm32_OverflowFromAdd op1: word op2: word out: word -> bool =
+    let sign1: bool = op1[31] in
+    let sign2: bool = op2[31] in
+    let signout: bool = out[31] in
+    let same_opsign: bool = sign1 == sign2 in
+    let diff_resign: bool = signout != sign1 in
+    same_opsign && diff_resign
+
+def arm32_getRotationImm r4: rotate_imm4 i8: imm8 -> word =
+	let r4_int: int = bv_to_uint(r4) in
+	let i8_word: word = bv_to_len(32, i8) in
+	let rr: int = r4_int * 2 in
+	let rl: int = 32 - rr in
+	let rr_word: word = arm32_inttoword(rr) in
+	let rl_word: word = arm32_inttoword(rl) in
+	let Imm_sh1: word = i8_word >> rr_word in
+	let Imm_sh2: word = i8_word << rl_word in
+	Imm_sh1 | Imm_sh2
+
+def arm32_ShifterCarryOut r4: rotate_imm4 i32: word cpsr: register -> bool =
+	let rot_zero: bool = r4 == 0x0 in
+	let dcpsr: word = *cpsr in
+	let prev_C: bool = dcpsr[29] in
+	let sign: bool = i32[31] in
+	rot_zero ? prev_C : sign
+
+(*******************************************************************************)
+(***************************** Basic Instructions ******************************)
+(*******************************************************************************)
+
+(* manual Page 178 *)
+(* data processing immediate layout P446*)
+defop CMP_imm Rn: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "cmp".armcc(Cond) ++ Rn.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*CMP.cond Rn, #Rotate+Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+      		let out: word = dRn b- Imm32 in
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+      		let isborrow: bool = arm32_BorrowFrom(dRn, Imm32) in
+      		let isoverflow: bool = arm32_OverflowFromSub(dRn, Imm32, out) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = isborrow ? C_unset : C_set in (*Note: Not BorrowFrom*)
+			let V_set: word = flag_set(dCPSR_NZC, 28) in
+			let V_unset: word = flag_unset(dCPSR_NZC, 28) in
+			let dCPSR_NZCV: word = isoverflow ? V_set : V_unset in
+			*CPSR <- dCPSR_NZCV
+		)
+		else
+			skip
+	]
+}
+
+defop CMP_reg Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "cmp".armcc(Cond) ++ Rn.txt ++ "," ++ Rm.txt, (*CMP.cond Rn, Rm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let dRm: word = *Rm in
+			let out: word = dRn b- dRm in
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+			let isborrow: bool = arm32_BorrowFrom(dRn, dRm) in
+			let isoverflow: bool = arm32_OverflowFromSub(dRn, dRm, out) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = isborrow ? C_unset : C_set in
+			let V_set: word = flag_set(dCPSR_NZC, 28) in
+			let V_unset: word = flag_unset(dCPSR_NZC, 28) in
+			let dCPSR_NZCV: word = isoverflow ? V_set : V_unset in
+			*CPSR <- dCPSR_NZCV
+		)
+		else
+			skip
+	]
+}
+
+(* manual Page 158 *)
+defop ANDS_imm Rd: register Rn: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "ands".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*AnD.cond Rd, Rn, #Rotate+Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+			let out: word = dRn & Imm32 in
+      		*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+			let iscarry: bool = arm32_ShifterCarryOut(Rotate_imm, Imm32, CPSR) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+      		(* V flag: unaffected *)
+			*CPSR <- dCPSR_NZC
+		)
+		else
+			skip
+	]
+}
+
+defop ANDS_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "ands".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rm.txt, (*ANDS Rd, Rn, Rm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+      		let dRm: word = *Rm in
+			let out: word = dRn & dRm in
+      		*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+		    (* C flag: unchanged *)
+		    (* V flag: unaffected *)
+			*CPSR <- dCPSR_NZ
+		)
+		else
+			skip
+	]
+}
+
+(* manual Page 156*)
+defop ADD_imm Rd: register Rn: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "add".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*ADD.cond Rd, Rn, #Rotate+Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+      		let out: word = dRn b+ Imm32 in
+			*Rd <- out
+		)
+		else 
+			skip
+	]
+}
+
+defop ADD_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "add".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rm.txt, (*ADD.cond Rd, Rn, Rm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let dRm: word = *Rm in
+			let out: word = dRn b+ dRm in
+			*Rd <- out
+		)
+		else
+			skip
+	]
+}
+
+(* manual Page 156*)
+defop ADDS_imm Rd: register Rn: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "adds".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*ADDS.cond Rd, Rn, #Rotate+Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+      		let out: word = dRn b+ Imm32 in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+      		let iscarry: bool = arm32_CarryFrom(dRn, Imm32) in
+      		let isoverflow: bool = arm32_OverflowFromAdd(dRn, Imm32, out) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+			let V_set: word = flag_set(dCPSR_NZC, 28) in
+			let V_unset: word = flag_unset(dCPSR_NZC, 28) in
+			let dCPSR_NZCV: word = isoverflow ? V_set : V_unset in
+			*CPSR <- dCPSR_NZCV
+		)
+		else
+			skip
+	]
+}
+
+defop ADDS_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "adds".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rm.txt, (*ADDS Rd, Rn, Rm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+      		let dRm: word = *Rm in
+      		let out: word = dRn b+ dRm in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+     	 	let iscarry: bool = arm32_CarryFrom(dRn, dRm) in
+      		let isoverflow: bool = arm32_OverflowFromAdd(dRn, dRm, out) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+			let V_set: word = flag_set(dCPSR_NZC, 28) in
+			let V_unset: word = flag_unset(dCPSR_NZC, 28) in
+			let dCPSR_NZCV: word = isoverflow ? V_set : V_unset in
+			*CPSR <- dCPSR_NZCV
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 358*)
+defop SUB_imm Rd: register Rn: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "sub".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*SUB.cond Rd, Rn, #Rotate+Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+      		let out: word = dRn b- Imm32 in
+			*Rd <- out
+		)
+		else 
+			skip
+	]
+}
+
+defop SUB_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "sub".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rm.txt, (*SUB.cond Rd, Rn, Rm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let dRm: word = *Rm in
+			let out: word = dRn b- dRm in
+			*Rd <- out
+		)
+		else 
+			skip
+	]
+}
+
+defop SUBS_imm Rd: register Rn: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "subs".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*SUBS.cond Rd, Rn, #Rotate+Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+      		let out: word = dRn b- Imm32 in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+      		let isborrow: bool = arm32_BorrowFrom(dRn, Imm32) in
+      		let isoverflow: bool = arm32_OverflowFromSub(dRn, Imm32, out) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = isborrow ? C_unset : C_set in (*Not BorrowFrom*)
+			let V_set: word = flag_set(dCPSR_NZC, 28) in
+			let V_unset: word = flag_unset(dCPSR_NZC, 28) in
+			let dCPSR_NZCV: word = isoverflow ? V_set : V_unset in
+			*CPSR <- dCPSR_NZCV
+		)
+		else
+			skip
+	]
+}
+
+defop SUBS_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "subs".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rm.txt, (*SUBS Rd, Rn, Rm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+	      	let dRm: word = *Rm in
+	      	let out: word = dRn b- dRm in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+      		let isborrow: bool = arm32_BorrowFrom(dRn, dRm) in
+      		let isoverflow: bool = arm32_OverflowFromSub(dRn, dRm, out) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = isborrow ? C_unset : C_set in (*Not BorrowFrom*)
+			let V_set: word = flag_set(dCPSR_NZC, 28) in
+			let V_unset: word = flag_unset(dCPSR_NZC, 28) in
+			let dCPSR_NZCV: word = isoverflow ? V_set : V_unset in
+			*CPSR <- dCPSR_NZCV
+		)
+		else
+			skip
+	]
+}
+(*manual Page 580*)
+defop LSLS_imm Rd: register Rm: register Imm: imm5 Cond: cond_field {
+	txt = "",
+	(* txt = "lsls".armcc(Cond) ++ Rd.txt ++ "," ++ Rm.txt ++ "," ++ Imm.txt, (*LSL.cond Rd, Rm, #Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRm: word = *Rm in
+			let imm_zero: bool = Imm == 0b00000 in
+			let Imm32: word = bv_to_len(32, Imm) in
+			let dRm_sh: word = dRm << Imm32 in
+			let out: word = imm_zero ? dRm : dRm_sh in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+
+			let dcpsr: word = *CPSR in
+			let prev_C: bool = dcpsr[29] in
+			let shift_bit: word = 0x00000020 b- bv_to_len(32, Imm) in
+			let iscarry: bool = 
+				if imm_zero then prev_C 
+				else checkbit(dRm, shift_bit)  (*C = Rm[32-imm5]*)
+			in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+			*CPSR <- dCPSR_NZC
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 582*)
+defop LSLS_reg Rd: register Rs: register Cond:cond_field {
+	txt = "",
+	(* txt = "lsls".armcc(Cond) ++ Rd.txt ++ "," ++ Rs.txt, (*LSL.cond Rd, Rs*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRs: word = *Rs in
+			let dRd: word = *Rd in
+			let Imm: byte = dRs[0:8] in
+			let Imm32: word = bv_to_len(32, Imm) in
+
+			let Imm_int: int = bv_to_uint(Imm) in
+			let imm_zero: bool = Imm_int == 0 in
+			let imm_s32: bool = Imm_int < 32 in
+			let imm_e32: bool = Imm_int == 32 in
+
+			let dcpsr: word = *CPSR in
+			let prev_C: bool = dcpsr[29] in
+			let shift_bit: word = 0x00000020 b- bv_to_len(32, Imm) in
+			let zero_C: bool = dRd[0] in
+			let iscarry: bool = 
+				if imm_zero then prev_C
+				else if imm_s32 then checkbit(dRd, shift_bit) (*C = Rd[32-Rs[7:0]]*)
+				else if imm_e32 then zero_C
+				else false
+			in
+			let out: word = 
+				if imm_zero then dRd
+				else if imm_s32 then dRd << Imm32
+				else 0x00000000
+			in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+			*CPSR <- dCPSR_NZC
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 584*)
+defop LSRS_imm Rd: register Rm: register Imm: imm5 Cond: cond_field {
+	txt = "",
+	(* txt = "lsrs".armcc(Cond) ++ Rd.txt ++ "," ++ Rm.txt ++ "," ++ Imm.txt, (*LSL.cond Rd, Rm, #Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRm: word = *Rm in
+			let Imm_int: int = bv_to_uint(Imm) in
+			let imm_zero: bool = Imm_int == 0 in
+			let Imm32: word = bv_to_len(32, Imm) in
+			let dRm_sh: word = dRm >> Imm32 in
+			let out: word = imm_zero ? dRm : dRm_sh in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+
+			let zero_C: bool = dRm[31] in
+			let shift_bit: word = bv_to_len(32, Imm) b- 0x00000001 in
+			let iscarry: bool = 
+				if imm_zero then zero_C 
+				else checkbit(dRm, shift_bit) (*C = Rm[imm5-1]*)
+			in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+			*CPSR <- dCPSR_NZC
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 586*)
+defop LSRS_reg Rd: register Rs: register Cond:cond_field {
+	txt = "",
+	(* txt = "lsrs".armcc(Cond) ++ Rd.txt ++ "," ++ Rs.txt, (*LSL.cond Rd, Rs*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRs: word = *Rs in
+			let dRd: word = *Rd in
+			let Imm: byte =dRs[0:8] in
+			let Imm32: word = bv_to_len(32, Imm) in
+
+			let Imm_int: int = bv_to_uint(Imm) in
+			let imm_zero: bool = Imm_int == 0 in
+			let imm_s32: bool = Imm_int < 32 in
+			let imm_e32: bool = Imm_int == 32 in
+
+			let dcpsr: word = *CPSR in
+			let prev_C: bool = dcpsr[29] in
+			let shift_bit: word = bv_to_len(32, Imm) b- 0x00000001 in
+			let zero_C: bool = dRd[31] in
+			let iscarry: bool = 
+				if imm_zero then prev_C
+				else if imm_s32 then checkbit(dRd, shift_bit) (*C = Rd[Rs[7:0]-1]*)
+				else if imm_e32 then zero_C
+				else false
+			in
+			let out: word = 
+				if imm_zero then dRd
+				else if imm_s32 then dRd >> Imm32
+				else 0x00000000
+			in
+			*Rd <- out;
+
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+			*CPSR <- dCPSR_NZC
+		)
+		else
+			skip
+	]
+}
+
+(*******************************************************************************)
+(****************************** MOV Instructions *******************************)
+(*******************************************************************************)
+
+(*manual Page 218*)
+defop MOV_imm Rd: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "mov".armcc(Cond) ++ Rd.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*MOV.cond Rd, #Imm*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+			*Rd <- Imm32
+		)
+		else
+			skip
+	]
+}
+
+defop MOV_reg Rd: register Rs: register Cond: cond_field {
+	txt = "",
+	(* txt = "mov".armcc(Cond) ++ Rd.txt ++ "," ++ Rs.txt, (*MOV.cond Rd, Rs*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRs: word = *Rs in
+			*Rd <- dRs
+		)
+		else
+			skip
+	]
+}
+
+defop MOVS_imm Rd: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "",
+	(* txt = "movs".armcc(Cond) ++ Rd.txt ++ "," ++ Rs.txt, (*MOV Rd, Rs*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm32: word = arm32_getRotationImm(Rotate_imm, Imm) in
+			*Rd <- Imm32;
+
+			let out: word = Imm32 in
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+			let iscarry: bool = arm32_ShifterCarryOut(Rotate_imm, Imm32, CPSR) in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			let C_set: word = flag_set(dCPSR_NZ, 29) in
+			let C_unset: word = flag_unset(dCPSR_NZ, 29) in
+			let dCPSR_NZC: word = iscarry ? C_set : C_unset in
+			(* V flag: unaffected *)
+			*CPSR <- dCPSR_NZC
+		)
+		else
+			skip
+	]
+}
+
+defop MOVS_reg Rd: register Rs: register Cond: cond_field {
+	txt = "",
+	(* txt = "movs".armcc(Cond) ++ Rd.txt ++ "," ++ Rs.txt, (*MOV Rd, Rs*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRs: word = *Rs in
+			*Rd <- dRs;
+
+			let out: word = dRs in
+			let isneg: bool = out[31] in
+			let iszero: bool = out == 0x00000000 in
+
+			let CPSR_value: word = *CPSR in
+			let N_set: word = flag_set(CPSR_value, 31) in
+			let N_unset: word = flag_unset(CPSR_value, 31) in
+			let dCPSR_N: word = isneg ? N_set : N_unset in
+			let Z_set: word = flag_set(dCPSR_N, 30) in
+			let Z_unset: word = flag_unset(dCPSR_N, 30) in
+			let dCPSR_NZ: word = iszero ? Z_set : Z_unset in
+			(* C flag: unchanged *)
+			(* V flag: unaffected *)
+			*CPSR <- dCPSR_NZ
+		)
+		else
+			skip
+	]
+}
+
+(* condition execution: Page 112 *)
+
+(*******************************************************************************)
+(********************* Data Transfer Instructions (LDR) ************************)
+(*******************************************************************************)
+
+(* reference: https://www.heyrick.co.uk/armwiki/LDR *)
+(* manual Page 193, 458*)
+(*word: immediate offset pre-indexed*)
+defop LDR_imm Rd: register Rn: register Imm: imm12 Cond: cond_field {
+	txt = "",
+	(* txt = "ldr".armcc(Cond) ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ ","  ++ Imm.txt ++ "]", (*LDR.cond Rd, [Rn, #Imm]*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm_word: word = bv_to_len(32, Imm) in
+			let out: word = dRn b+ Imm_word in
+			let cont: word = fetch[out, 32] in
+			*Rd <- cont
+		)
+		else
+			skip
+	]
+}
+
+(*word: register offset pre-indexed*)
+defop LDR_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "ldr".armcc(Cond) ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ ","  ++ Rm.txt ++ "]",  (*LDR.cond Rd, [Rn, Rm]*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let dRm: word = *Rm in
+			let out: word = dRn b+ dRm in
+			let cont: word = fetch[out, 32] in
+			*Rd <- cont
+		)
+		else
+			skip
+	]
+}
+
+defop LDR_label Rd: register Lbl: word Cond: cond_field {
+	txt = "",
+	(* txt = "ldr".armcc(Cond) ++ Rd.txt ++ "," ++ Lbl.txt,  (*LDR.cond Rd, Lbl*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let cont: word = fetch[Lbl, 32] in
+			*Rd <- cont
+		)
+		else
+			skip
+	]
+}
+
+(* manual Page 196, 458*)
+(*unsigned byte: immediate offset pre-indexed*)
+defop LDRB_imm Rd: register Rn: register Imm: imm12 Cond: cond_field {
+	txt = "",
+	(* txt = "ldrb".armcc(Cond) ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ ","  ++ Imm.txt ++ "]", (*LDRB.cond Rd, [Rn, #Imm]*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm_word: word = bv_to_len(32, Imm) in
+			let out: word = dRn b+ Imm_word in
+			let cont_byte: 8 bit = bv_to_len(8, fetch[out, 32]) in
+			let cont: word = bv_to_len(32, cont_byte) in
+			*Rd <- cont
+		)
+		else
+			skip
+	]
+}
+
+(*unsigned byte: register offset pre-indexed*)
+defop LDRB_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt ="ldrb".armcc(Cond) ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ ","  ++ Rm.txt ++ "]", (*LDRB.cond Rd, [Rn, Rm]*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let dRm: word = *Rm in
+			let out: word = dRn b+ dRm in
+			let cont_byte: 8 bit = bv_to_len(8, fetch[out, 32]) in
+			let cont: word = bv_to_len(32, cont_byte) in
+			*Rd <- cont
+		)
+		else
+			skip
+	]
+}
+
+(* LDR Rd, [Rn] = LDR_imm Rd Rn 0 *)
+
+(*post-indexed, Page 468*)
+(* LDR Rd, [Rn], #Imm = LDR_imm Rd Rn 0; ADD_imm Rn Rn Imm *)
+(* LDR Rd, [Rn], Rm = LDR_imm Rd Rn 0; ADD_reg Rn Rn Rm *)
+
+(*******************************************************************************)
+(********************* Data Transfer Instructions (STR) ************************)
+(*******************************************************************************)
+
+(* reference: https://www.heyrick.co.uk/armwiki/STR *)
+(* manual Page 343, 458*)
+
+(*word: immediate offset pre-indexed*)
+defop STR_imm Rd: register Rn: register Imm: imm12 Cond: cond_field {
+	txt = "",
+	(* txt = "str".armcc(Cond) ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ ","  ++ Imm.txt ++ "]",(*STR Rd, [Rn, #Imm]*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let Imm_word: word = bv_to_len(32, Imm) in
+			let out: word = dRn b+ Imm_word in
+			let dRd: word = *Rd in
+			store[out, 32] <- dRd
+		)
+		else
+			skip
+	]
+}
+
+(*word: register offset pre-indexed*)
+defop STR_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "",
+	(* txt = "str".armcc(Cond) ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ ","  ++ Rm.txt ++ "]", (*STR Rd, [Rn, Rm]*) *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRn: word = *Rn in
+			let dRm: word = *Rm in
+			let out: word = dRn b+ dRm in
+			let dRd: word = *Rd in
+			store[out, 32] <- dRd
+		)
+		else
+			skip
+	]
+}
+
+
+(* manual Page 224*)
+(* Rs should be either CPSR or SPSR*)
+defop MRS Rd: register Rs: register Cond: 4 bit {
+	txt = "",
+	(* txt = "mrs$1 $2, $3" armcc(Cond) Rd.txt Rs.txt (*MRS Rd Rs*), *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let is_cpsr: bool = Rs == CPSR in
+			let is_spsr: bool = Rs == SPSR in
+			let is_cpsr_or_spsr: bool = is_cpsr || is_spsr in 
+			assert is_cpsr_or_spsr;
+			let dRs: word = *Rs in
+			*Rd <- dRs
+		)
+		else
+			skip
+	]
+}
+
+(* manual Page 227*)
+(* Rd should be either CPSR or SPSR*)
+defop MSR_reg Rd: register Rs: register Cond: 4 bit {
+	txt = "",
+	(* txt = "msr$1 $2, $3" armcc(Cond) Rd.txt Rs.txt (*MSR Rd, Rs*), *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let is_cpsr: bool = Rd == CPSR in
+			let is_spsr: bool = Rd == SPSR in
+			let is_cpsr_or_spsr: bool = is_cpsr || is_spsr in 
+			assert is_cpsr_or_spsr;
+			let dRs: word = *Rs in
+			*Rd <- dRs
+		)
+		else
+			skip
+	]
+}
+
+(* Rd should be either CPSR_<field> or SPSR_<field>*)
+(*MSR CPSR_c, Imm*)
+defop MSR_CPSR_c Imm: 8 bit Cond: 4 bit {
+	txt = "",
+	(* txt = "msr$1 cpsr_c, 0x$2" armcc(Cond) Imm.hex (*MSR CPSR_c, Imm*), *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm_word: word = bv_to_len(32, Imm) in
+			let byte_mask: word = 0x000000FF in
+			(*
+			let priv_mask: word = 0xF80F0200 | 0x000001DF in
+			let mask: word = byte_mask & priv_mask in
+			let notmask: word = ~ mask in
+			let dCPSR: word = *CPSR in
+			let dCPSR_mask: word = dCPSR & notmask in
+			let Imm_mask: word = Imm_word & mask in
+			*CPSR <- dCPSR_mask | Imm_mask
+			*)
+			let notmask: word = ~ byte_mask in
+			let dCPSR: word = *CPSR in
+			let dCPSR_mask: word = dCPSR & notmask in
+			*CPSR <- dCPSR_mask | Imm_word
+		)
+		else
+			skip
+	]
+}
+
+defop MSR_CPSR_f Imm: 8 bit Cond: 4 bit {
+	txt = "",
+	(* txt = "msr$1 cpsr_f, 0x$2" armcc(Cond) Imm.hex (*MSR CPSR_f, Imm*), *)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm_word: word = bv_to_len(32, Imm) in
+			let byte_mask: word = 0xFF000000 in
+			let rotate_word: word = arm32_inttoword(6) in
+			let Imm_shword: word = Imm_word << rotate_word in
+			(*
+			let priv_mask: word = 0xF80F0200 | 0x000001DF in
+			let mask: word = byte_mask & priv_mask in
+			let notmask: word = ~ mask in
+			let dCPSR: word = *CPSR in
+			let dCPSR_mask: word = dCPSR & notmask in
+			let Imm_mask: word = Imm_word & mask in
+			*CPSR <- dCPSR_mask | Imm_mask
+			*)
+			let notmask: word = ~ byte_mask in
+			let dCPSR: word = *CPSR in
+			let dCPSR_mask: word = dCPSR & notmask in
+			*CPSR <- dCPSR_mask | Imm_shword
+		)
+		else
+			skip
+	]
+}
+
+(*STR Rd, [Rn] = STR_imm Rd Rn 0*)
+(*post-indexed, Page 468*)
+(* STR Rd, [Rn], #Imm = STR_imm Rd Rn 0; ADD_imm Rn Rn Imm *)
+(* STR Rd, [Rn], Rm = STR_imm Rd Rn 0; ADD_reg Rn Rn Rm *)

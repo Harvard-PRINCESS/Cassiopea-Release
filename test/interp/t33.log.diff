@@ -1,0 +1,10 @@
+--- t33.log.good	2019-12-16 13:59:49.418496036 -0800
++++ t33.log	2019-12-16 14:12:09.869932131 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t33.prog with start state t33.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t33.prog with start state t33.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ Fatal error: exception Failure("concrete execution failed at t33.casp:15,6-15,28 with error: store: no memory defined")
+ Fatal error: exception Failure("concrete execution failed at t33.casp:15,6-15,28 with error: store: no memory defined")
+ FAILED

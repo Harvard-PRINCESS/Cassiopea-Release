@@ -1,0 +1,94 @@
+CASSIOPEIA=../../cassiopeia
+ALEWIFE=../../alewife
+ALE_DIR=./alewife
+SPEC_DIR=./spec
+PROG_DIR=./prog
+VERIFY_DIR=../evalout/verify
+SYNTH_DIR=../evalout/synth
+
+PROG_ARM=./prog/arm
+PROG_X86=./prog/x86-64
+MAP_ARM=./arch_arm/map.casp
+MAP_X86=./arch_x86-64/map.casp
+CASP_ARM=./arch_arm/arm.casp
+CASP_X86=./arch_x86-64/x86-64.casp
+
+USECASE_ARM=\
+disp_check_disabled \
+disp_check_low \
+disp_check_high \
+disp_set_area
+
+USECASE_X86=\
+disp_check_disabled \
+disp_check_low \
+disp_check_high
+
+clean:
+	@rm -rf $(SPEC_DIR)
+	@mkdir -p $(SPEC_DIR)
+
+ale:
+	@echo "---[barrelfish-arm]---"
+	@for d in $(USECASE_ARM); do \
+		$(ALEWIFE) $(ALE_DIR)/$$d.ale $(MAP_ARM) -o $(SPEC_DIR)/$$d.arm.spec; done
+	@echo "---[barrelfish-x86-64]---"
+	@for d in $(USECASE_X86); do \
+		$(ALEWIFE) $(ALE_DIR)/$$d.ale $(MAP_X86) -o $(SPEC_DIR)/$$d.x86.spec; done
+
+interp:
+	@echo "---[barrelfish-arm]---"
+	@for d in $(USECASE_ARM); do \
+		$(CASSIOPEIA) $(CASP_ARM) -interp $(PROG_ARM)/$$d.prog $(PROG_ARM)/$$d.init; done
+	@echo "---[barrelfish-x86-64]---"
+	@for d in $(USECASE_X86); do \
+		$(CASSIOPEIA) $(CASP_X86) -interp $(PROG_X86)/$$d.prog $(PROG_X86)/$$d.init; done
+
+verify: verifyarm verifyx86
+verifyarm: 
+	@echo "---[barrelfish-arm]---"
+	@for d in $(USECASE_ARM); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_ARM) -verify $(SPEC_DIR)/$$d.arm.spec $(PROG_ARM)/$$d.prog; done
+verifyx86: 
+	@echo "---[barrelfish-x86-64]---"
+	@for d in $(USECASE_X86); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_X86) -verify $(SPEC_DIR)/$$d.x86.spec $(PROG_X86)/$$d.prog; done
+
+synth: syntharm synthx86
+syntharm: 
+	@echo "---[barrelfish-arm]---"
+	@for d in $(USECASE_ARM); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_ARM) -synth $(SPEC_DIR)/$$d.arm.spec; done
+synthx86:
+	@echo "---[barrelfish-x86-64]---"
+	@for d in $(USECASE_X86); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_X86) -synth $(SPEC_DIR)/$$d.x86.spec; done
+
+# output to files, for evaluation
+verifyout: verifyarmout verifyx86out
+verifyarmout:
+	@echo "---[barrelfish-arm]---"
+	@for d in $(USECASE_ARM); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_ARM) -verify $(SPEC_DIR)/$$d.arm.spec $(PROG_ARM)/$$d.prog -o $(VERIFY_DIR)/verify.bfish.arm.$$d.out; done
+verifyx86out: 
+	@echo "---[barrelfish-x86-64]---"
+	@for d in $(USECASE_X86); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_X86) -verify $(SPEC_DIR)/$$d.x86.spec $(PROG_X86)/$$d.prog -o $(VERIFY_DIR)/verify.bfish.x86.$$d.out; done
+
+synthout: syntharmout synthx86out
+syntharmout:
+	@echo "---[barrelfish-arm]---"
+	@for d in $(USECASE_ARM); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_ARM) -synth $(SPEC_DIR)/$$d.arm.spec -o $(SYNTH_DIR)/synth.bfish.arm.$$d.out; done
+synthx86out:
+	@echo "---[barrelfish-x86-64]---"
+	@for d in $(USECASE_X86); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASSIOPEIA) $(CASP_X86) -synth $(SPEC_DIR)/$$d.x86.spec -o $(SYNTH_DIR)/synth.bfish.x86$$d.out; done

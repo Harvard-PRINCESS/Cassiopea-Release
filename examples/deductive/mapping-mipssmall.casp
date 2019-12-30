@@ -1,0 +1,16 @@
+module load5 {
+  letstate Mem: 32 bit 5 len 32 ref memory
+
+  let reg1: register = r1
+  let reg2: register = r2
+  let reg3: register = r3
+  let reg4: register = r4
+  let reg5: register = r5
+
+  let base: word = [Mem, 0]
+  let v1: word = fetch[base b+ 0x00000000, 32]
+  let v2: word = fetch[base b+ 0x00000004, 32]
+  let v3: word = fetch[base b+ 0x00000008, 32]
+  let v4: word = fetch[base b+ 0x0000000c, 32]
+  let v5: word = fetch[base b+ 0x00000010, 32]
+}

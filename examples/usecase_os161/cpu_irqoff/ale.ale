@@ -1,0 +1,6 @@
+require function interrupts_are_on: () bool
+
+block cpu_irqoff {
+	pre: interrupts_are_on() == false
+	post: interrupts_are_on() == true
+}

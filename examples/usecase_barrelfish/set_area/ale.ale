@@ -1,0 +1,19 @@
+require value areareg: reg
+require value dispreg: reg
+require value outreg: reg
+
+require function enabled_flag: () bool
+require function disabled_flag: () bool
+require function enabled_area: (word) word
+require function disabled_area: (word) word
+
+block disp_set_area {	
+	let outbv: vec = *outreg
+	let dispbv: vec = *dispreg
+	let b_zero: bool = (outbv == (0: wordsize vec))
+
+	pre: (outbv == (0: wordsize vec)) || (outbv == (1: wordsize vec))
+	post:
+		(!b_zero || (enabled_flag() && *areareg == enabled_area(dispbv)) ) &&
+		(b_zero || (disabled_flag() && *areareg == disabled_area(dispbv)) )
+}

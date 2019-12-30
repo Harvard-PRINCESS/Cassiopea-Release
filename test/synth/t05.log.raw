@@ -1,0 +1,28 @@
+Command: Synthesize for spec t05.spec output to t05.out; log to t05.log.raw
+Output to: t05.out
+Log to: t05.log.raw
+Synthesis with 0 insts starting
+Found dependencies in: 0.006763s
+Found value dependencies in: 0.000026s
+Iter 1 Guessing...	Guessing Time: 0.000695s
+Iter 1 Checking...	Checking Time: 0.006014s
+Iter 2 Guessing...	Guessing Time: 0.000037s
+Synthesis with 0 insts failed with 1 candidates, 1 counterexamples!
+Synthesis with 1 insts starting
+Found dependencies in: 0.007692s
+Found value dependencies in: 0.000039s
+Iter 1 Guessing...	Guessing Time: 0.000768s
+Iter 1 Checking...	Checking Time: 0.005901s
+Iter 2 Guessing...	Guessing Time: 0.000186s
+Synthesis with 1 insts failed with 1 candidates, 1 counterexamples!
+Synthesis with 2 insts starting
+Found dependencies in: 0.007196s
+Found value dependencies in: 0.000039s
+Iter 1 Guessing...	Guessing Time: 0.000614s
+Iter 1 Checking...	Checking Time: 0.006110s
+Iter 2 Guessing...	Guessing Time: 0.001311s
+Iter 2 Checking...	Checking Time: 0.005240s
+Synthesis with 2 insts succeeded! Prog:
+(EQ 0b00000000000000000000000000000000 0b00000000000000000000000000000000)
+(SW 0b00000000000000000000000000000000)
+	Execution Time: 0.092251s

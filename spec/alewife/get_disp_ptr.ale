@@ -1,0 +1,13 @@
+require val dcb_current: ptr
+require val offset_of_dcb_disp: int
+require val ret: reg
+
+accesses ret
+modifies ret
+
+pre:
+	*ret = dcb_current
+
+post:
+	*ret = MEMORY(dcb_current + offset_of_dcb_disp)
+	(* ret = dcb_current -> disp *)

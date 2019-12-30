@@ -1,0 +1,16 @@
+--- t27.log.good	2019-12-16 13:59:49.418496036 -0800
++++ t27.log	2019-12-16 14:12:09.853932123 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t27.prog with start state t27.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t27.prog with start state t27.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -39,4 +41,4 @@
+ wt: R1
+ rd: CPSR R2
+ wt: R1
+-	Execution Time: 0.004192s
++	Execution Time: 0.003835s

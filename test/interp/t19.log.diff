@@ -1,0 +1,16 @@
+--- t19.log.good	2019-12-16 13:59:49.414496083 -0800
++++ t19.log	2019-12-16 14:12:09.725932066 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t19.prog with start state t19.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t19.prog with start state t19.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -169,4 +171,4 @@
+ wt: R1
+ rd: CPSR
+ wt: R1
+-	Execution Time: 0.004583s
++	Execution Time: 0.004517s

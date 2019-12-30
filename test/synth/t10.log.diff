@@ -1,0 +1,21 @@
+--- t10.log.good	2019-12-16 13:59:49.422495993 -0800
++++ t10.log	2019-12-30 10:21:57.272699083 -0800
+@@ -1,8 +1,16 @@
+-Command: Synthesize for spec t10.spec and output to t10.out, log to t10.log.raw
++Command: Synthesize for spec t10.spec output to t10.out; log to t10.log.raw
++Output to: t10.out
++Log to: t10.log.raw
++Synthesis with 0 insts starting
++Found dependencies in: 0.008227s
++Found value dependencies in: 0.000034s
+ Iter 1 Guessing...	Guessing Time: ???s
+ Iter 1 Checking...	Checking Time: ???s
+ Iter 2 Guessing...	Guessing Time: ???s
+-Synthesis with 0 insts failed with 1 counterexamples!
++Synthesis with 0 insts failed with 1 candidates, 1 counterexamples!
++Synthesis with 1 insts starting
++Found dependencies in: 0.006958s
++Found value dependencies in: 0.000045s
+ Iter 1 Guessing...	Guessing Time: ???s
+ Iter 1 Checking...	Checking Time: ???s
+ Iter 2 Guessing...	Guessing Time: ???s

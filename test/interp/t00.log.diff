@@ -1,0 +1,16 @@
+--- t00.log.good	2019-12-16 13:59:49.414496083 -0800
++++ t00.log	2019-12-16 14:12:09.501931964 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t00.prog with start state t00.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t00.prog with start state t00.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ concrete execution succeeded
+ Interp results:
+ MEMORY:
+@@ -165,4 +167,4 @@
+ wt: R1
+ rd: CPSR R1
+ wt: CPSR
+-	Execution Time: 0.019159s
++	Execution Time: 0.004374s

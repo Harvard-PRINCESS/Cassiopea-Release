@@ -1,0 +1,49 @@
+--- t11.log.good	2019-12-16 13:59:49.422495993 -0800
++++ t11.log	2019-12-30 10:21:58.128702659 -0800
+@@ -1,20 +1,30 @@
+-Command: Synthesize for spec t11.spec and output to t11.out, log to t11.log.raw
++Command: Synthesize for spec t11.spec output to t11.out; log to t11.log.raw
++Output to: t11.out
++Log to: t11.log.raw
++Synthesis with 0 insts starting
++Found dependencies in: 0.018428s
++Found value dependencies in: 0.000050s
+ Iter 1 Guessing...	Guessing Time: ???s
+ Iter 1 Checking...	Checking Time: ???s
+ Iter 2 Guessing...	Guessing Time: ???s
+-Synthesis with 0 insts failed with 1 counterexamples!
++Synthesis with 0 insts failed with 1 candidates, 1 counterexamples!
++Synthesis with 1 insts starting
++Found dependencies in: 0.018425s
++Found value dependencies in: 0.001369s
+ Iter 1 Guessing...	Guessing Time: ???s
+ Iter 1 Checking...	Checking Time: ???s
+ Iter 2 Guessing...	Guessing Time: ???s
+-Iter 2 Checking...	Checking Time: ???s
+-Iter 3 Guessing...	Guessing Time: ???s
+-Synthesis with 1 insts failed with 2 counterexamples!
++Synthesis with 1 insts failed with 1 candidates, 1 counterexamples!
++Synthesis with 2 insts starting
++Found dependencies in: 0.017340s
++Found value dependencies in: 0.010120s
+ Iter 1 Guessing...	Guessing Time: ???s
+ Iter 1 Checking...	Checking Time: ???s
+ Iter 2 Guessing...	Guessing Time: ???s
+-Iter 2 Checking...	Checking Time: ???s
+-Iter 3 Guessing...	Guessing Time: ???s
+-Synthesis with 2 insts failed with 2 counterexamples!
++Synthesis with 2 insts failed with 1 candidates, 1 counterexamples!
++Synthesis with 3 insts starting
++Found dependencies in: 0.017614s
++Found value dependencies in: 0.023782s
+ Iter 1 Guessing...	Guessing Time: ???s
+ Iter 1 Checking...	Checking Time: ???s
+ Iter 2 Guessing...	Guessing Time: ???s
+@@ -23,6 +33,6 @@
+ Iter 3 Checking...	Checking Time: ???s
+ Synthesis with 3 insts succeeded! Prog:
+ (ADD r0 r3)
+-(ADD r0 r2)
+ (ADD r0 r1)
++(ADD r0 r2)
+ 	Execution Time: ???s

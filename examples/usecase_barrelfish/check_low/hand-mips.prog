@@ -1,0 +1,3 @@
+(LW r4 r28 0x0000)
+(SLTU r2 r5 r4)
+(MOVN r4 r0 r2)

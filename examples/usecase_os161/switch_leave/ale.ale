@@ -1,0 +1,12 @@
+require value wordsize: int
+require value switchframesize: int
+require value stackptr: wordsize reg
+require value stacksgrowup: bool
+
+block switch_any {
+   let initsp: word = *stackptr
+   pre: true
+   post: *stackptr ==
+      (if stacksgrowup then initsp - switchframesize
+      else initsp + switchframesize)
+}

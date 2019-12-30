@@ -1,0 +1,4 @@
+defop nop {
+   txt = "nop",
+   sem = [ skip ]
+}

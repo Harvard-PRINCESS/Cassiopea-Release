@@ -1,0 +1,17 @@
+let JB_LEN: int = 11
+
+let r29_slot: 32 bit = 0x00000000
+let r31_slot: 32 bit = 0x00000004
+let r16_slot: 32 bit = 0x00000008
+let r17_slot: 32 bit = 0x0000000c
+let r18_slot: 32 bit = 0x00000010
+let r19_slot: 32 bit = 0x00000014
+let r20_slot: 32 bit = 0x00000018
+let r21_slot: 32 bit = 0x0000001c
+let r22_slot: 32 bit = 0x00000020
+let r23_slot: 32 bit = 0x00000024
+let r30_slot: 32 bit = 0x00000028
+
+let reg_arg_buf: gpreg = r4
+let reg_arg_retval: gpreg = r5
+let reg_retval: gpreg = r2

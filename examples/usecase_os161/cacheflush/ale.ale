@@ -1,0 +1,14 @@
+require type cacheline
+require type cachelinestate
+require value wordsize: int
+require value cacheentrysize: int
+require value vaddr_reg: wordsize reg
+
+require function vaddr_to_l2cache_entry: (word) cacheline
+
+block l2cache_wbinv_vaddr {
+   let entry: cacheline = vaddr_to_l2cache_entry( *vaddr_reg)
+   let entry_prestate: cachelinestate = *entry
+   pre: true
+   post: *entry == cache_wbinv(entry_prestate)
+}

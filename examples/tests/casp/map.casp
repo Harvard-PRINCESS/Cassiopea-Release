@@ -1,0 +1,18 @@
+module prog_ldr {
+	include "small.casp";
+	let resultreg: register = R1
+	let dispreg: register = R2
+}
+
+module prog_str {
+	include "small.casp";
+	let resultreg: register = R1
+	let dispreg: register = R2
+}
+
+module prog_noptr {
+	include "small.casp";
+	let resultreg: register = R1
+	let dispreg: register = R2
+	def addone v: word -> word = v b+ 0x00000001
+}

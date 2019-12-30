@@ -1,0 +1,2 @@
+(SLTIU r5 r4 0x0001)
+(ADDU r5 r5 r4)

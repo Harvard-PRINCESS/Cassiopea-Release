@@ -1,0 +1,44 @@
+(********** alewife mappings **********)
+
+module initregs {
+	letstate mem_gp: 64 bit 1 len 64 ref memory with lbl_gp
+	def crt0_additional_initialization -> bool = true
+	let crt0_argc_reg: register = RAX
+	let crt0_argv_reg: register = RBX
+	let crt0_environ_reg: register = RCX
+}
+
+module savevals {
+	def readlbl l: 64 label -> word = fetch[l, 64]
+	let crt0_argv_reg: register = RBX
+	let crt0_environ_reg: register = RCX
+}
+
+module longjmp_ret {
+	let reg_arg_retval: register = RAX
+	let reg_retval: register = RBX
+	reg-modify: RCX C Z
+}
+
+module setjmp_ret {
+	let reg_retval: register = RBX
+}
+
+module syscalls_loadnum {
+	let syscall_callnum_reg: register = RDX
+	let callnum: word = 0x0000000000000010 (* CALLNUM for syscalls_loadnum *)
+}
+
+module cpu_irqoff {
+  def interrupts_are_on -> bool = *IF == 0b1
+  reg-modify: IF
+}
+
+module switch_any {
+	(* shared among all four of the switch blocks *)
+	let switchframesize: 64 bit = 0x0000000000000040 (* 64 *)
+	let stackptr: 64 bit loc = RSP
+	let stacksgrowup: bool = false
+	let oldframe_arg_reg: 64 bit loc = RAX
+	let newframe_arg_reg: 64 bit loc = RCX
+}

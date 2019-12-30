@@ -1,0 +1,10 @@
+bind b: ghost_bool
+bind biv: ghost_vec
+block addcond3 {
+  pre: 
+  	(b = addcond3()) &&
+  	(biv = get_cont(dispreg))
+  post:
+    (~ b || loaded_addcond3(biv, true)) &&
+    (b || loaded_addcond3(biv, false))
+}

@@ -1,0 +1,2 @@
+This example is supposed to set the current page table base address in
+the MMU.

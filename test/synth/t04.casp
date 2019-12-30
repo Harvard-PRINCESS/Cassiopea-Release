@@ -1,0 +1,22 @@
+letstate allmem: 32 bit 8 len 32 ref memory
+
+letstate r: 32 bit loc
+
+defop EQ a: 32 bit  b: 32 bit  {
+   txt = "", (* "eq " ++ a.txt ++ ", " ++ b.txt, *)
+   sem = [
+      if a == b then
+         *r <- 0x00000001
+      else
+         *r <- 0x00000000
+   ]
+}
+
+defop SW addr: 32 bit {
+   txt = "", (* "sw " ++ addr.txt, *)
+   sem = [
+      let ptr: 32 bit = [allmem, 0] in
+      let ptr2: 32 bit = ptr b+ addr in
+      store[ptr2, 32] <- *r
+   ]
+}

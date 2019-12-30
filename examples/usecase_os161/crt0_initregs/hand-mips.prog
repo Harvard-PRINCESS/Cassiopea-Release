@@ -1,0 +1,2 @@
+(extern lbl_gp)
+(LA r28 lbl_gp)

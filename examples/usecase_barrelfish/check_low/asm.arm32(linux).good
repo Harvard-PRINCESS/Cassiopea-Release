@@ -1,0 +1,3 @@
+ldrlo r1, [r2, #0]
+cmp r1, lr
+movhi r1, #0x00000000

@@ -1,0 +1,11 @@
+require value wordsize: int
+require value asidsize: int
+require value reg_arg_asid: wordsize reg
+
+require function mmu_asid: () asidsize vec
+
+block mmu_setasid {
+   let asid: word = *reg_arg_asid
+   pre: bv_to_len(wordsize, bv_to_len(asidsize, asid)) == asid
+   post: mmu_asid() == bv_to_len(asidsize, asid)
+}

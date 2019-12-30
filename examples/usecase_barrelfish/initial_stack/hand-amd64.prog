@@ -1,0 +1,2 @@
+(LEA_imm_reg_reg RSP RIP 8)
+(* lea (KERNEL_STACK + KERNEL_STACK_SIZE)(%rip), %rsp *)

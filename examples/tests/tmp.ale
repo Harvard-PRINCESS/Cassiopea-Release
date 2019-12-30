@@ -1,0 +1,10 @@
+block ptr {
+let dis: ptr = get(dispreg)
+let cont: bit = match mem_cont(disp) with Vec v -> v | NO
+  pre: 
+	
+  post:
+    loaded_ptr(cont, resultreg)
+}
+
+

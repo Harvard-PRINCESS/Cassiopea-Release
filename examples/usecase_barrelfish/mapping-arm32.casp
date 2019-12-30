@@ -1,0 +1,76 @@
+(********** alewife mappings **********)
+module disp_check_disabled {
+	include "mapping-arm32-shared.casp";
+	letstate Mem: 32 bit 1 len 32 ref memory
+	def disp_disabled -> word = [Mem, 0]
+	def disabled_rescheck rreg: register rbv: word -> bool = (rbv == *rreg)
+	reg-modify: N Z C V
+}
+
+module disp_check_low {
+	include "mapping-arm32-shared.casp";
+	letstate Mem: 32 bit 1 len 32 ref memory
+	def disp_crit_low -> word = [Mem, 0] (* OFFSETOF_DISP_CRIT_PC_LOW = 96 *)
+	def critlow_check critbv: word pcbv: word -> bool =
+		(* (disp->crit_pc_lo <= pc), will check high, otherwise, move 0 *)
+		let out: word = critbv b- pcbv in
+		(out bs< 0x00000000) || (out == 0x00000000)
+	def critlow_resT resr: register contw: word -> bool = *resr == contw
+	def critlow_resF resr: register contw: word -> bool = *resr == 0x00000000
+	reg-modify: N Z C V
+}
+
+module disp_check_high {
+	include "mapping-arm32-shared.casp";
+	letstate Mem: 32 bit 1 len 32 ref memory
+	def disp_crit_high -> word = [Mem, 0] (* OFFSETOF_DISP_CRIT_PC_HIGH = 100 *)
+	def crithigh_check critbv: word pcbv: word -> bool =
+		(* (pc < disp->crit_pc_hi), move 1, otherwise move 0 *)
+		let out: word = pcbv b- critbv in
+		out bs< 0x00000000
+	def crithigh_resT resr: register -> bool = *resr == 0x00000001
+	def crithigh_resF resr: register -> bool = *resr == 0x00000000
+	reg-modify: N Z C V
+}
+
+module disp_set_area {
+	include "mapping-arm32-shared.casp";
+	let areareg: register = R0
+
+	(* OFFSETOF_DISP_ENABLED_AREA *)
+	def enabled_area contw: word -> word = contw b+ 0x00000070
+
+	(* OFFSETOF_DISP_DISABLED_AREA*)
+	def disabled_area contw: word -> word = contw b+ 0x000001B8
+	reg-modify: N Z C V
+}
+
+module initial_stack {
+	letstate BASE: 32 bit 4 len 32 ref memory
+	let basereg: register = R9
+	let stackreg: register = R13
+	let kernel_stack_size: word = 0x00000008
+	let kernel_stack: word = 0x00000000
+	let STACKLEN: int = 4
+	def check_base base: word -> bool = base == [BASE, 0]
+	def get_stack base: word offset: word -> word =
+		let addr: word = base b+ offset in
+		fetch[addr, 32]
+}
+
+module get_disp {
+	letstate BASE: 32 bit 4 len 32 ref memory
+	letstate dcb_struct: 32 bit 1 len 32 ref memory
+	let basereg: register = R0
+	let dispreg: register = R2
+	let dcb_current_idx: word = 0x00000000
+	let dcb_disp: word = 0x00000008
+	let DCBLEN: int = 4
+	def check_base base: word dcb_offset: word -> bool =
+		let addr: word = base b+ dcb_offset in
+		(base == [BASE, 0]) && (fetch [ addr, 32 ] == [dcb_struct, 0])
+	def get_dcb base: word dcb_offset: word -> word =
+		let addr: word = base b+ dcb_offset in
+		fetch [fetch [ addr, 32 ], 32]
+	def get_disp addr: word -> word = fetch [ addr, 32 ]
+}

@@ -1,0 +1,5 @@
+Command: Verify prog t02.prog against spec t02.spec output to t02.out; log to t02.log.raw
+Output to: t02.out
+Log to: t02.log.raw
+Verification succeeded!
+	Execution Time: ???s

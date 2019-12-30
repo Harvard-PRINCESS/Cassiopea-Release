@@ -1,0 +1,10 @@
+--- t31.log.good	2019-12-16 13:59:49.418496036 -0800
++++ t31.log	2019-12-16 14:12:09.865932129 -0800
+@@ -1,4 +1,6 @@
+-Command: Interpret prog t31.prog with start state t31.init and output to <stdout>, log to <stdout>
++Command: Interpret prog t31.prog with start state t31.init output to <stdout>; log to <stdout>
++Output to: 
++Log to: 
+ Fatal error: exception Failure("concrete execution failed at t31.casp:20,6-20,27 with error: store: misalignment: offset 3735928559 is not aligned (byte index) for region allmem")
+ Fatal error: exception Failure("concrete execution failed at t31.casp:20,6-20,27 with error: store: misalignment: offset 3735928559 is not aligned (byte index) for region allmem")
+ FAILED

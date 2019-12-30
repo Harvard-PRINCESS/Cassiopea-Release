@@ -1,0 +1,42 @@
+Command: Synthesize for spec spec-arm32.spec output to synth-arm32.prog; log to synth-arm32.log
+Output to: synth-arm32.prog
+Log to: synth-arm32.log
+Synthesis with 0 insts starting
+Found dependencies in: 0.003637s
+Found value dependencies in: 0.000070s
+Iter 1 Guessing...	Guessing Time: 0.005052s
+Iter 1 Checking...	Checking Time: 0.004500s
+Iter 2 Guessing...	Guessing Time: 0.000108s
+Synthesis with 0 insts failed with 1 candidates, 1 counterexamples!
+Synthesis with 1 insts starting
+Found dependencies in: 0.003418s
+Found value dependencies in: 0.000088s
+Iter 1 Guessing...	Guessing Time: 0.005469s
+Iter 1 Checking...	Checking Time: 0.004720s
+Iter 2 Guessing...	Guessing Time: 0.000114s
+Synthesis with 1 insts failed with 1 candidates, 1 counterexamples!
+Synthesis with 2 insts starting
+Found dependencies in: 0.003549s
+Found value dependencies in: 0.000157s
+Iter 1 Guessing...	Guessing Time: 0.005367s
+Iter 1 Checking...	Checking Time: 0.006003s
+Iter 2 Guessing...	Guessing Time: 0.000136s
+Synthesis with 2 insts failed with 1 candidates, 1 counterexamples!
+Synthesis with 3 insts starting
+Found dependencies in: 0.003480s
+Found value dependencies in: 0.017185s
+Iter 1 Guessing...	Guessing Time: 0.007088s
+Iter 1 Checking...	Checking Time: 0.071767s
+Iter 2 Guessing...	Guessing Time: 4.303365s
+Iter 2 Checking...	Checking Time: 0.079052s
+Iter 3 Guessing...	Guessing Time: 3.513462s
+Iter 3 Checking...	Checking Time: 0.101645s
+Iter 4 Guessing...	Guessing Time: 3.955176s
+Iter 4 Checking...	Checking Time: 0.134674s
+Iter 5 Guessing...	Guessing Time: 8.115559s
+Iter 5 Checking...	Checking Time: 0.093592s
+Synthesis with 3 insts succeeded! Prog:
+(LDR_imm R2 R0 0b000000000000 0b1110)
+(LDR_imm R2 R2 0b000000000000 0b1110)
+(LDR_imm R2 R2 0b000000001000 0b1110)
+	Execution Time: 31.771269s

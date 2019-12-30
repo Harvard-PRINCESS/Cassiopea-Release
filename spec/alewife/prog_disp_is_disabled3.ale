@@ -1,0 +1,9 @@
+bind b: ghost_bool
+block prog_disp_is_disabled3 {
+  pre: is_null(flagreg) && is_null(dispreg) && (b = before_critical(dispreg)) && before_flag()
+  post:
+    (* not strictly correct but close enough *)
+    is_null(dispreg) &&
+    (~ b || loaded_before_critical(resultreg, true)) &&
+    (b || loaded_before_critical(resultreg, false))
+}

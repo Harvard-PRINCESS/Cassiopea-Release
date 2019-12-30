@@ -1,0 +1,117 @@
+module cpu_irqoff {
+   (* XXX I don't kno whow to do this *)
+   def interrupts_are_on -> bool = false
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}
+
+module initregs {
+   (* XXX I think sparc64 has something like mips %gp to set here *)
+   def crt0_additional_initialization -> bool = true
+   let crt0_argc_reg: gpreg = i0
+   let crt0_argv_reg: gpreg = i1
+   let crt0_environ_reg: gpreg = i3
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}
+
+module savevals {
+   def readlbl l: 64 label -> word = fetch[l, 64]
+   let crt0_argv_reg: gpreg = i0
+   let crt0_environ_reg: gpreg = i1
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}
+
+module setjmp_ret {
+   let reg_retval: gpreg = i0
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}
+
+module longjmp_ret {
+   let reg_arg_retval: gpreg = i0
+   let reg_retval: gpreg = i0
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}
+
+module setjmp_full {
+   (*
+    * this assumes it *doesn't* allocate a register window
+    *)
+   let reg_arg_buf: gpreg = o0
+   let reg_retval: gpreg = o0
+   (*let JB_LEN: int = 7*)
+   let JB_LEN: int = 3
+
+   let pre_o7: 64 bit = *o7 (* return address *)
+   let pre_i6: 64 bit = *i6 (* stack pointer *)
+   let pre_g1: 64 bit = *g1
+   (* skip currently disabled registers *)
+(*
+   let pre_g2: 64 bit = *g2
+   let pre_g3: 64 bit = *g3
+   let pre_g6: 64 bit = *g6
+   let pre_g7: 64 bit = *g7
+*)
+   def jmp_bufsaved (bufptr: word) -> bool =
+      fetch [bufptr b+ 0x00000000, 64] == pre_o7 &&
+      fetch [bufptr b+ 0x00000008, 64] == pre_i6 &&
+      fetch [bufptr b+ 0x00000010, 64] == pre_g1
+(* &&
+      fetch [bufptr b+ 0x00000018, 64] == pre_g2 &&
+      fetch [bufptr b+ 0x00000020, 64] == pre_g3 &&
+      fetch [bufptr b+ 0x00000028, 64] == pre_g6 &&
+      fetch [bufptr b+ 0x00000030, 64] == pre_g7
+*)
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}
+
+module longjmp_full {
+   (*
+    * This assumes that it *does* allocate a register window.
+    *
+    * XXX it needs to flush the register windows to memory at the
+    * beginning. Otherwise (IIUC) arbitrarily changing the stack
+    * pointer to pop off arbitrarily many frames will confuse the
+    * processor and kernel's tracking of which windows are loaded, so
+    * the next spill might dump stuff we intended to discard over
+    * frames we still need and clobber everything beyond repair.
+    * Although I'm not entirely clear on exactly how that stuff works.
+    *
+    * But given that we need to have our own window so that the
+    * parent frame will get reloaded when we pop it. Again, IIUC.
+    *
+    * Thus we reload %o7 into %i7, and put the return value in %i0
+    * rather than %o0.
+    *)  
+   let reg_arg_buf: gpreg = i0
+   let reg_arg_retval: gpreg = i1
+   let reg_retval: gpreg = i0
+   (*let JB_LEN: int = 7*)
+   let JB_LEN: int = 3
+
+   let pre_o7: 64 bit = fetch [bufptr b+ 0x00000000, 64]
+   let pre_i6: 64 bit = fetch [bufptr b+ 0x00000008, 64]
+   let pre_g1: 64 bit = fetch [bufptr b+ 0x00000010, 64]
+   (* skip currently disabled registers *)
+(*
+   let pre_g2: 64 bit = fetch [bufptr b+ 0x00000018, 64]
+   let pre_g3: 64 bit = fetch [bufptr b+ 0x00000020, 64]
+   let pre_g6: 64 bit = fetch [bufptr b+ 0x00000028, 64]
+   let pre_g7: 64 bit = fetch [bufptr b+ 0x00000030, 64]
+*)
+   def jmp_bufloaded -> bool =
+      *i7 == pre_ra &&
+      *i6 == pre_i6 &&
+      *g1 == pre_g1
+(* &&
+      *g2 == pre_g2 &&
+      *g3 == pre_g3 &&
+      *g6 == pre_g6 &&
+      *g7 == pre_g7
+*)
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}
+
+module syscalls_loadnum {
+   let syscall_callnum_reg: gpreg = g1
+   let callnum: word = 0x00000010
+   reg-modify: xnf xzf xvf xcf inf izf ivf icf
+}

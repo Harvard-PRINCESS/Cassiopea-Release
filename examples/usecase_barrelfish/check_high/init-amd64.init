@@ -1,0 +1,2 @@
+(memory M: 64 bit 4 len 64 ref)
+(RCX = [M, 0])

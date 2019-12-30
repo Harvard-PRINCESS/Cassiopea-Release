@@ -1,0 +1,2 @@
+(MOVaddr_reg_off RDI RIP 0)
+(MOVaddr_reg_off RDI RDI 8)

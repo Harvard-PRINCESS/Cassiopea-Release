@@ -1,0 +1,7 @@
+(memory stack1: 64 bit 11 len 64 ref)
+(memory stack2: 64 bit 11 len 64 ref)
+(memory thread: 64 bit 2 len 64 ref)
+(RAX = [thread, 0])
+(RCX = [thread, 1])
+([thread, 1] = [stack2, 0])
+(RSP = [stack1, 10])

@@ -1,0 +1,3 @@
+mov 1(%rax), %rbx
+cmp %rax, $0x00000000
+cmovnz %rax, %rbx

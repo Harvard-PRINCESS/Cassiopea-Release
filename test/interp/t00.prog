@@ -1,0 +1,11 @@
+(* Condition 1 *)
+
+(*
+// precondition: 
+// r2 points to the disp struct
+// OFFSETOF_DISP_DISABLED is correct
+*)
+
+(* Case 1: *)
+(LDRB_imm R1 R2 0x000 0b1110)
+(CMP_imm R1 0x0 0x01 0b1110)

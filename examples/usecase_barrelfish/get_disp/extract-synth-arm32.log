@@ -1,0 +1,4 @@
+Command: Extract ASM from prog synth-arm32.prog output to extract-synth-arm32.asm; log to extract-synth-arm32.log
+Output to: extract-synth-arm32.asm
+Log to: extract-synth-arm32.log
+	Execution Time: 0.003344s

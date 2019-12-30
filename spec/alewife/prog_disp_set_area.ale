@@ -1,0 +1,7 @@
+bind b: ghost_bool
+block prog_disp_set_area {
+  pre: is_null(dispreg) && is_null(areareg) && is_zero_or_one(resultreg) && (b = is_null(resultreg)) (* is_null R1 not generally correct *)
+  post:
+    (~ b || loaded_area(dispreg, areareg, true)) &&
+    (b || loaded_area(dispreg, areareg, false))
+}

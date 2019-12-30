@@ -1,0 +1,795 @@
+(* Source: https://www.scss.tcd.ie/~waldroj/3d1/arm_arm.pdf *)
+
+let wordsize: int = 32
+type word = 32 bit
+type byte = 8 bit
+type flg = 1 bit loc
+type register = word loc
+type cond_field = 4 bit
+type rotate_imm4 = 4 bit
+type imm8 = 8 bit
+type imm12 = 12 bit
+type imm5 = 5 bit
+
+(*CPSR current program status register*)
+letstate R0: register  (* first function argument *)
+letstate R1: register  (* second function argument *)
+letstate R2: register  (* third function argument *)
+letstate R3: register  (* fourth function argument *)
+letstate R4: register  (* fifth function argument *)
+letstate R5: register
+letstate R6: register
+letstate R7: register
+letstate R8: register
+letstate R9: register  (* PIC_REGISTER *)
+letstate R10: register
+letstate R11: register
+letstate R12: register
+letstate R13: register  (* stack pointer *)
+letstate R14: register  (* link register *)
+letstate N: flg (* CPSR[31] *)
+letstate Z: flg (* CPSR[30] *)
+letstate C: flg (* CPSR[29] *)
+letstate V: flg (* CPSR[28] *)
+letstate M: 5 bit loc
+letstate I: flg
+
+let wordzero : word = uint_to_bv_l(wordsize, 0)
+let wordone : word = uint_to_bv_l(wordsize, 1)
+	
+let R0.txt = "r0"
+let R1.txt = "r1"
+let R2.txt = "r2"
+let R3.txt = "r3"
+let R4.txt = "r4"
+let R5.txt = "r5"
+let R6.txt = "r6"
+let R7.txt = "r7"
+let R8.txt = "r8"
+let R9.txt = "r9"
+let R10.txt = "r10"
+let R11.txt = "r11"
+let R12.txt = "r12"
+let R13.txt = "sp"
+let R14.txt = "lr"
+let N.txt = "cpsr_n"
+let Z.txt = "cpsr_z"
+let C.txt = "cpsr_c"
+let V.txt = "cpsr_v"
+
+let IRQ_mode: imm5 = 0b10010
+let FIQ_mode: imm5 = 0b10001
+let super_mode: imm5 = 0b10011
+let user_mode: imm5 = 0b10000
+let abort_mode: imm5 = 0b10111
+let undef_mode: imm5 = 0b11011
+let sys_mode: imm5 = 0b11111
+
+(* banked register aliases *)
+(* let R8_fiq: reg = R8
+let R9_fiq: reg = R9
+let R10_fiq: reg = R10
+let R11_fiq: reg = R11
+let R12_fiq: reg = R12
+let R13_fiq: reg
+let R14_fiq: reg
+let R13_irq: reg
+let R14_irq: reg
+let R13_svc: reg
+let R14_svc: reg *)
+
+(********** cassiopeia functions **********)
+
+def is_in_super -> bool =
+  *M == super_mode
+
+def irq_is_on -> bool =
+  *I == 0b1
+
+def arm32_checkcond op: cond_field -> bool =
+	let N_bit: bool = *N == 0b1 in
+	let Z_bit: bool = *Z == 0b1 in
+	let C_bit: bool = *C == 0b1 in
+	let V_bit: bool = *V == 0b1 in
+	let C_not_Z: bool = C_bit && !Z_bit in
+	let N_eq_V: bool = N_bit == V_bit in
+	let not_Z_N_eq_V: bool = !Z_bit && N_eq_V in
+
+	switch op: cond_field with
+		case 0b0000 -> Z_bit? true: false
+		case 0b0001 -> Z_bit? false: true
+		case 0b0010 -> C_bit? true: false
+		case 0b0011 -> C_bit? false: true
+		case 0b0100 -> N_bit? true: false
+		case 0b0101 -> N_bit? false: true
+		case 0b0110 -> V_bit? true: false
+		case 0b0111 -> V_bit? false: true
+		case 0b1000 -> C_not_Z? true: false
+		case 0b1001 -> C_not_Z? false: true
+		case 0b1010 -> N_eq_V? true: false
+		case 0b1011 -> N_eq_V? false: true
+		case 0b1100 -> not_Z_N_eq_V? true: false
+		case 0b1101 -> not_Z_N_eq_V? false: true
+		case 0b1110 -> true
+		case _ -> true
+	end
+
+def armcc op: cond_field -> string = 
+	switch op: cond_field with 
+		case 0b0000 -> "eq"
+		case 0b0001 -> "ne"
+		case 0b0010 -> "hs"
+		case 0b0011 -> "lo"
+		case 0b0100 -> "mi"
+		case 0b0101 -> "pl"
+		case 0b0110 -> "vs"
+		case 0b0111 -> "vc"
+		case 0b1000 -> "hi"
+		case 0b1001 -> "ls"
+		case 0b1010 -> "ge"
+		case 0b1011 -> "lt"
+		case 0b1100 -> "gt"
+		case 0b1101 -> "le"
+		case _ -> ""
+	end
+
+def arm32_BorrowFrom op1: word op2: word -> bool =
+	(* uint(op1) - uint(op2) < 0 *)
+	let out: word = op1 b- op2 in
+	out bs< uint_to_bv_l(wordsize, 0)
+
+def arm32_CarryFrom op1: word op2: word -> bool =
+	(* uint(op1) + uint(op2) > maxint *)
+	let out: word = op1 b+ op2 in 
+	out bs> ( ~ uint_to_bv_l(wordsize, 0) )
+
+def arm32_OverflowFromSub op1: word op2: word out: word -> bool =
+	let diff_opsign: bool = op1[wordsize - 1] != op2[wordsize - 1] in
+	let diff_resign: bool = out[wordsize - 1] != op1[wordsize - 1] in
+	diff_opsign && diff_resign
+
+def arm32_OverflowFromAdd op1: word op2: word out: word -> bool =
+	let same_opsign: bool = op1[wordsize - 1] == op2[wordsize - 1] in
+	let diff_resign: bool = out[wordsize - 1] != op1[wordsize - 1] in
+	same_opsign && diff_resign
+
+def arm32_getRotationImm r4: rotate_imm4 i8: imm8 -> word =
+	let i8_word: word = bv_to_len(wordsize, i8) in
+	let r4_word: word = bv_to_len(wordsize, r4) in
+	let rr_word: word = r4_word b+ r4_word in (* r4 * 2 *)
+	let rl_word: word = uint_to_bv_l(wordsize, wordsize) b- rr_word in (* 32 - (r4 * 2) *)
+	let Imm_sh1: word = i8_word >> rr_word in
+	let Imm_sh2: word = i8_word << rl_word in
+	Imm_sh1 | Imm_sh2
+
+def arm32_ShifterCarryOut r4: rotate_imm4 i32: word prev_C: 1 bit -> bool =
+	let rot_zero: bool = r4 == 0x0 in
+	let sign: bool = i32[wordsize - 1] in
+	let prevC: bool = (prev_C == 0b1) in
+	rot_zero ? prevC : sign
+
+(********** Basic Instructions **********)
+(* manual Page 178 *)
+(* data processing immediate layout P446*)
+defop CMP_imm Rn: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("cmp$1 $2, #0x$3", armcc(Cond), Rn.txt, Imm32.hex),
+	typ = arith:"cmp",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm32: word = arm32_getRotationImm(Rot_imm, Imm) in
+			let out: word = *Rn b- Imm32 in
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let isborrow: bool = arm32_BorrowFrom( *Rn, Imm32) in
+			let isoverflow: bool = arm32_OverflowFromSub( *Rn, Imm32, out) in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- isborrow ? 0b0 : 0b1; (*Note: Not BorrowFrom*)
+			*V <- isoverflow ? 0b1 : 0b0
+		)
+		else
+			skip
+	]
+}
+
+defop CMP_reg Rn: register Rm: register Cond: cond_field {
+	txt = format("cmp$1 $2, $3", armcc(Cond), Rn.txt, Rm.txt),
+	typ = arith:"cmp",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			assert !isptr( *Rm);
+			let out: word = *Rn b- *Rm in
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let isborrow: bool = arm32_BorrowFrom( *Rn, *Rm) in
+			let isoverflow: bool = arm32_OverflowFromSub( *Rn, *Rm, out) in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- isborrow ? 0b0 : 0b1; (*Note: Not BorrowFrom*)
+			*V <- isoverflow ? 0b1 : 0b0
+		)
+		else
+			skip
+	]
+}
+
+(* manual Page 158 *)
+defop ANDS_imm Rd: register Rn: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("ands$1 $2, $3, #0x$4", armcc(Cond), Rd.txt, Rn.txt, Imm32.hex),
+	typ = logic:"and",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm32: word = arm32_getRotationImm(Rot_imm, Imm) in
+			let out: word = *Rn & Imm32 in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let iscarry: bool = arm32_ShifterCarryOut(Rot_imm, Imm32, *C) in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- iscarry ? 0b1 : 0b0
+			(* V flag: unaffected *)
+		)
+		else
+			skip
+	]
+}
+
+defop ANDS_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("ands$1 $2, $3, $4", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = logic:"and",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let out: word = *Rn & *Rm in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0
+			(* C flag: unchanged *)
+			(* V flag: unaffected *)
+		)
+		else
+			skip
+	]
+}
+
+(* manual Page 156*)
+defop ADD_imm Rd: register Rn: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("add$1 $2, $3, #0x$4", armcc(Cond), Rd.txt, Rn.txt, Imm32.hex),
+	typ = arith:"add",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+			*Rd <- *Rn b+ arm32_getRotationImm(Rot_imm, Imm)
+		else 
+			skip
+	]
+}
+
+defop ADD_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("add$1 $2, $3, $4", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = arith:"add",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+			*Rd <- *Rn b+ *Rm
+		else
+			skip
+	]
+}
+
+(* manual Page 156*)
+defop ADDS_imm Rd: register Rn: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("adds$1 $2, $3, #0x$4", armcc(Cond), Rd.txt, Rn.txt, Imm32.hex),
+	typ = arith:"add",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm32: word = arm32_getRotationImm(Rot_imm, Imm) in
+			let out: word = *Rn b+ Imm32 in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let iscarry: bool = arm32_CarryFrom( *Rn, Imm32) in
+			let isoverflow: bool = arm32_OverflowFromAdd( *Rn, Imm32, out) in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- iscarry ? 0b1 : 0b0;
+			*V <- isoverflow? 0b1 : 0b0
+		)
+		else
+			skip
+	]
+}
+
+defop ADDS_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("adds$1 $2, $3, $4", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = arith:"add",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let out: word = *Rn b+ *Rm in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let iscarry: bool = arm32_CarryFrom( *Rn, *Rm) in
+			let isoverflow: bool = arm32_OverflowFromAdd( *Rn, *Rm, out) in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- iscarry ? 0b1 : 0b0;
+			*V <- isoverflow? 0b1 : 0b0
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 358*)
+defop SUB_imm Rd: register Rn: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("sub$1 $2, $3, #0x$4", armcc(Cond), Rd.txt, Rn.txt, Imm32.hex),
+	typ = arith:"sub",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+			*Rd <- *Rn b- arm32_getRotationImm(Rot_imm, Imm)
+		else 
+			skip
+	]
+}
+
+defop SUB_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("sub$1 $2, $3, $4", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = arith:"sub",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+			*Rd <- *Rn b- *Rm
+		else 
+			skip
+	]
+}
+
+defop SUBS_imm Rd: register Rn: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("subs$1 $2, $3, #0x$4", armcc(Cond), Rd.txt, Rn.txt, Imm32.hex),
+	typ = arith:"sub",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let Imm32: word = arm32_getRotationImm(Rot_imm, Imm) in
+			let out: word = *Rn b- Imm32 in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let isborrow: bool = arm32_BorrowFrom( *Rn, Imm32) in
+			let isoverflow: bool = arm32_OverflowFromSub( *Rn, Imm32, out) in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- isborrow ? 0b0 : 0b1; (*Not BorrowFrom*)
+			*V <- isoverflow? 0b1 : 0b0
+		)
+		else
+			skip
+	]
+}
+
+defop SUBS_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("subs$1 $2, $3, $4", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = arith:"sub",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let out: word = *Rn b- *Rm in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let isborrow: bool = arm32_BorrowFrom( *Rn, *Rm) in
+			let isoverflow: bool = arm32_OverflowFromSub( *Rn, *Rm, out) in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- isborrow ? 0b0 : 0b1; (*Not BorrowFrom*)
+			*V <- isoverflow? 0b1 : 0b0
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 580*)
+defop LSLS_imm Rd: register Rm: register Imm: imm5 Cond: cond_field {
+	txt = format("lsls$1 $2, $3, #$4", armcc(Cond), Rd.txt, Rm.txt, Imm.dec),
+	typ = arith:"lsl",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRm: word = *Rm in
+			let imm_zero: bool = bv_to_len(wordsize, Imm) == wordzero in
+			let dRm_sh: word = dRm << bv_to_len(wordsize, Imm) in
+			let out: word = imm_zero ? dRm : dRm_sh in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let shift_bit: imm5 = Imm b- 0b00001 in
+			let dRm_sh1: word = dRm << bv_to_len(wordsize, shift_bit) in
+			let iscarry: bool = dRm_sh1[wordsize - 1] in
+			let prev_C: 1 bit = *C in
+			let carry: 1 bit = iscarry ? 0b1 : 0b0 in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- imm_zero ? prev_C : carry
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 582*)
+defop LSLS_reg Rd: register Rs: register Cond:cond_field {
+	txt = format("lsls$1 $2, $3", armcc(Cond), Rd.txt, Rs.txt),
+	typ = arith:"lsl",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRs: word = *Rs in
+			let dRd: word = *Rd in
+			let Imm: byte = dRs[0:8] in
+			let out: word = dRd << bv_to_len(wordsize, Imm) in
+			*Rd <- out;
+
+			let iscarry: bool =
+					let shift_bit: byte = Imm b- 0x01 in
+					let dRm_sh1: word = dRs << bv_to_len(wordsize, shift_bit) in
+					dRm_sh1[wordsize - 1]
+			in
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let rs_zero: bool = Imm == 0x00 in
+			let prev_C: 1 bit = *C in
+			let carry: 1 bit = iscarry ? 0b1 : 0b0 in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- rs_zero? prev_C : carry
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 584*)
+defop LSRS_imm Rd: register Rm: register Imm: imm5 Cond: cond_field {
+	txt = format("lsrs$1 $2, $3, #$4", armcc(Cond), Rd.txt, Rm.txt, Imm.dec),
+	typ = arith:"lsr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRm: word = *Rm in
+			let imm_zero: bool = bv_to_len(wordsize, Imm) == wordzero in
+			let dRm_sh: word = dRm >> bv_to_len(wordsize, Imm) in
+			let out: word = imm_zero ? dRm : dRm_sh in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let shift_bit: imm5 = Imm b- 0b00001 in
+			let dRm_sh1: word = dRm >> bv_to_len(wordsize, shift_bit) in
+			let iscarry: bool = 
+				if imm_zero then dRm[wordsize - 1]
+				else dRm_sh1[0]
+			in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- iscarry ? 0b1 : 0b0
+		)
+		else
+			skip
+	]
+}
+
+(*manual Page 586*)
+defop LSRS_reg Rd: register Rs: register Cond:cond_field {
+	txt = format("lsrs$1 $2, $3", armcc(Cond), Rd.txt, Rs.txt),
+	typ = arith:"lsr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let dRs: word = *Rs in
+			let dRd: word = *Rd in
+			let Imm: byte = dRs[0:8] in
+			let out: word = dRd >> bv_to_len(wordsize, Imm) in
+			*Rd <- out;
+
+			let iscarry: bool = 
+					let shift_bit: byte = Imm b- 0x01 in
+					let dRm_sh1: word = dRs >> bv_to_len(wordsize, shift_bit) in
+					dRm_sh1[0]
+			in
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let rs_zero: bool = Imm == 0x00 in
+			let prev_C: 1 bit = *C in
+			let carry: 1 bit = iscarry ? 0b1 : 0b0 in
+
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- rs_zero? prev_C : carry
+		)
+		else
+			skip
+	]
+}
+
+(* MOV Instructions *)
+
+(*manual Page 218*)
+defop MOV_imm Rd: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("mov$1 $2, #0x$3", armcc(Cond), Rd.txt, Imm32.hex),
+	typ = dataop:"mov",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+			*Rd <- arm32_getRotationImm(Rot_imm, Imm)
+		else
+			skip
+	]
+}
+
+defop MOV_reg Rd: register Rs: register Cond: cond_field {
+	txt = format("mov$1 $2, $3", armcc(Cond), Rd.txt, Rs.txt),
+	typ = dataop:"mov",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+			*Rd <- *Rs
+		else
+			skip
+	]
+}
+
+defop MOVS_imm Rd: register Rot_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = let Imm32 : word = arm32_getRotationImm(Rot_imm, Imm) in
+		format("movs$1 $2, #0x$3", armcc(Cond), Rd.txt, Imm32.hex),
+	typ = dataop:"mov",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let out: word = arm32_getRotationImm(Rot_imm, Imm) in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			let iscarry: bool = arm32_ShifterCarryOut(Rot_imm, out, *C) in
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0;
+			*C <- iscarry ? 0b1 : 0b0
+			(* V flag: unaffected *)
+		)
+		else
+			skip
+	]
+}
+
+defop MOVS_reg Rd: register Rs: register Cond: cond_field {
+	txt = format("movs$1 $2, $3", armcc(Cond), Rd.txt, Rs.txt),
+	typ = dataop:"mov",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let out: word = *Rs in
+			*Rd <- out;
+
+			let isneg: bool = out[wordsize - 1] in
+			let iszero: bool = out == wordzero in
+			*N <- isneg ? 0b1 : 0b0;
+			*Z <- iszero ? 0b1 : 0b0
+			(* C flag: unchanged *)
+			(* V flag: unaffected *)
+		)
+		else
+			skip
+	]
+}
+
+(* Data Transfer Instructions (LDR) *)
+
+(* reference: https://www.heyrick.co.uk/armwiki/LDR *)
+(* manual Page 193, 458*)
+(*word: immediate offset pre-indexed*)
+defop LDR_imm Rd: register Rn: register Imm: imm12 Cond: cond_field {
+	txt = format("ldr$1 $2, [$3, #$4]", armcc(Cond), Rd.txt, Rn.txt, Imm.dec),
+	typ = memoryop:"ldr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			assert isptr( *Rn);
+			let out: word = *Rn b+ bv_to_len(wordsize, Imm) in
+			*Rd <- fetch[out, wordsize]
+		)
+		else
+			skip
+	]
+}
+
+(*word: register offset pre-indexed*)
+defop LDR_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("ldr$1 $2, [$3, $4]", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = memoryop:"ldr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			assert isptr( *Rn);
+			let out: word = *Rn b+ *Rm in
+			*Rd <- fetch[out, wordsize]
+		)
+		else
+			skip
+	]
+}
+
+defop LDR_label Rd: register Lbl: 32 label Cond: cond_field {
+	txt = format("ldr$1 $2, =$3", armcc(Cond), Rd.txt, Lbl.lbl),
+	typ = memoryop:"ldr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then *Rd <- Lbl
+		else skip
+	]
+}
+
+defop LDR_const Rd: register Const: word Cond: cond_field {
+	txt = format("ldr$1 $2, =$3", armcc(Cond), Rd.txt, Const.hex),
+	typ = dataop:"ldr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then *Rd <- Const
+		else skip
+	]
+}
+
+(* manual Page 196, 458*)
+(*unsigned byte: immediate offset pre-indexed*)
+defop LDRB_imm Rd: register Rn: register Imm: imm12 Cond: cond_field {
+	txt = format("ldrb$1 $2, [$3, #$4]", armcc(Cond), Rd.txt, Rn.txt, Imm.dec),
+	typ = memoryop:"ldr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			assert isptr( *Rn);
+			let out: word = *Rn b+ bv_to_len(wordsize, Imm) in
+			*Rd <- bv_to_len(wordsize, bv_to_len(8, fetch[out, wordsize]))
+		)
+		else
+			skip
+	]
+}
+(*unsigned byte: register offset pre-indexed*)
+defop LDRB_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("ldrb$1 $2, [$3, $4]", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = memoryop:"ldr",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			assert isptr( *Rn);
+			let out: word = *Rn b+ *Rm in
+			*Rd <- bv_to_len(wordsize, bv_to_len(8, fetch[out, wordsize]))
+		)
+		else
+			skip
+	]
+}
+
+
+(* Data Transfer Instructions (STR) *)
+
+(* reference: https://www.heyrick.co.uk/armwiki/STR *)
+(* manual Page 343, 458*)
+
+(*word: immediate offset pre-indexed*)
+defop STR_imm Rd: register Rn: register Imm: imm12 Cond: cond_field {
+	txt = format("str$1 $2, [$3, #$4]", armcc(Cond), Rd.txt, Rn.txt, Imm.dec),
+	typ = memoryop:"str",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			assert isptr( *Rn);
+			let out: word = *Rn b+ bv_to_len(wordsize, Imm) in
+			store[out, wordsize] <- *Rd
+		)
+		else
+			skip
+	]
+}
+
+(*word: register offset pre-indexed*)
+defop STR_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = format("str$1 $2, [$3, $4]", armcc(Cond), Rd.txt, Rn.txt, Rm.txt),
+	typ = memoryop:"str",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			assert isptr( *Rn);
+			let out: word = *Rn b+ *Rm in
+			store[out, wordsize] <- *Rd
+		)
+		else
+			skip
+	]
+}
+
+(* manual A4-29 *)
+(* interrupt enable *)
+defop CPS_irq enable: bool {
+	txt = format("cps$1", enable ? "IE i" : "ID i"),
+	typ = "interrupt":"cps",
+	sem = [
+		if is_in_super () then
+			if enable then
+				*I <- 0b1
+			else
+				*I <- 0b0
+		else
+			skip
+	]
+}
+
+defop B Imm: 8 bit Cond: cond_field {
+	txt = format("b$1 $2", armcc(Cond), Imm.hex),
+	typ = "branch":"jmp",
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+      BRANCH(bv_to_uint(Imm))
+		else
+			skip
+	]
+}

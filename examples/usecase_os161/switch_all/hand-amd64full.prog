@@ -1,0 +1,26 @@
+(ADD_imm RSP 0xffffffffffffffc0 (* -64 *))
+
+(* RBX, RBP, RDI, RSI, RSP, R12, R13, R14, and R15 *)
+(MOVaddst_reg_off RBX RSP 0)
+(MOVaddst_reg_off RBP RSP 8)
+(MOVaddst_reg_off RDI RSP 16)
+(MOVaddst_reg_off RSI RSP 24)
+(MOVaddst_reg_off R12 RSP 32)
+(MOVaddst_reg_off R13 RSP 40)
+(MOVaddst_reg_off R14 RSP 48)
+(MOVaddst_reg_off R15 RSP 56)
+
+(MOVaddst_reg_reg RSP RAX)
+
+(MOVaddr_reg_reg RSP RCX)
+
+(MOVaddr_reg_off RBX RSP 0)
+(MOVaddr_reg_off RBP RSP 8)
+(MOVaddr_reg_off RDI RSP 16)
+(MOVaddr_reg_off RSI RSP 24)
+(MOVaddr_reg_off R12 RSP 32)
+(MOVaddr_reg_off R13 RSP 40)
+(MOVaddr_reg_off R14 RSP 48)
+(MOVaddr_reg_off R15 RSP 56)
+
+(ADD_imm RSP 0x0000000000000040 (* 64 *))

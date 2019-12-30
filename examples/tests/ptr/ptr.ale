@@ -1,0 +1,12 @@
+region M1: word bit 4 len word ref
+region M2: word bit 4 len word ref
+bind cont: ghost_vec
+bind disp: ghost_ptr
+block ptr {
+  pre: 
+	(disp = get_cont(dispreg)) &&
+	(cont = get_memcont(dispreg))
+  post:
+    cont = get_cont(resultreg)
+}
+

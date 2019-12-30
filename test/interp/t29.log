@@ -1,0 +1,6 @@
+Command: Interpret prog t29.prog with start state t29.init output to <stdout>; log to <stdout>
+Output to: 
+Log to: 
+Fatal error: exception Failure("concrete execution failed at t28.casp:9,9-9,21 with error: assertion failed")
+Fatal error: exception Failure("concrete execution failed at t28.casp:9,9-9,21 with error: assertion failed")
+FAILED

@@ -1,0 +1,105 @@
+type word = 32 bit
+type halfword = 16 bit
+type doubleword = 64 bit
+type byte = 8 bit
+type register = word loc
+type doubleregister = doubleword loc
+type cond_field = 2 bit
+type rotate_imm4 = 4 bit
+type imm8 = 8 bit
+type imm12 = 12 bit
+type imm5 = 5 bit
+type flg = 1 bit loc
+
+letstate R0: register  (* first function argument *)
+letstate R1: register  (* second function argument *)
+letstate R2: register  (* third function argument *)
+letstate R14: register  (* link register *)
+letstate N: flg
+letstate Z: flg
+(* letstate M: 32 bit 4 len 32 ref memory *)
+
+let resultreg: register = R1
+let areareg: register = R0
+let dispreg: register = R2
+let pcreg: register = R14
+
+def get_cont r: register -> word = *r
+def get_memcont r: register -> word = read [ *r, 32]
+
+(* add1.ale *)
+def loaded_add1 biv: word -> bool = 
+	let dR1: word = *resultreg in
+		(dR1 == biv b+ 0x00000001)
+
+(* add2.ale *)
+def loaded_add2 biv: word -> bool = 
+	let dR1: word = *resultreg in
+	let dR0: word = *areareg in
+	(dR1 == biv b+ 0x00000001) && (dR0 == biv b+ 0x00000004)
+
+(* add3.ale *)
+def loaded_add3 biv: word -> bool = 
+	let dR1: word = *resultreg in
+	let dR2: word = *dispreg in
+	let dR0: word = *areareg in
+	let dR14: word = *pcreg in
+	(dR1 == biv b+ 0x00000001) && 
+	(dR0 == biv b+ 0x00000003) && 
+	(dR14 == biv b+ 0x00000005)
+	
+(* addcond0.ale *)
+def addcond0 -> bool =
+	( *N == 0b1)
+def loaded_addcond0 biv: word biv2: word b: bool -> bool = 
+	let dR1: word = *resultreg in
+	if b then 
+		(dR1 == biv b+ 0x00000001)
+	else 
+		(dR1 == biv2)
+
+(* ptr.ale *)
+def loaded_ptr cont: word outreg: register -> bool = 
+	*outreg == cont
+
+def checkcond op: cond_field -> bool =
+	let N_bit: bool = ( *N == 0b1) in
+	let Z_bit: bool = ( *Z == 0b1) in
+
+	switch op: cond_field with
+		case 0b00 -> Z_bit? true: false
+		case 0b01 -> Z_bit? false: true
+		case 0b10 -> N_bit? true: false
+		case 0b11 -> true
+		case _ -> true
+	end
+
+defop ADD_imm Rd: register Rn: register Imm: word Cond: cond_field {
+	txt = "ADD" ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Imm.txt,
+	sem = [
+			if checkcond (Cond) then
+				*Rd <- *Rn b+ Imm
+			else skip
+	]
+}
+
+defop SUB_imm Rd: register Rn: register Imm: word Cond: cond_field {
+	txt = "ADD" ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Imm.txt,
+	sem = [
+			if checkcond (Cond) then
+				*Rd <- *Rn b- Imm
+			else skip
+
+	]
+}
+
+(*word: register offset pre-indexed*)
+defop LDR Rd: register Rn: register Imm: word Cond: cond_field {
+	txt = "ldr" ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ "," ++ Rm.txt ++ "]", 
+	sem = [
+			if checkcond (Cond) then
+				let out: word = *Rn b+ Imm in
+				*Rd <- read[out, 32]
+			else skip
+	]
+}

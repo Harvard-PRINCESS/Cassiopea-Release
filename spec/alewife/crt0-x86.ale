@@ -1,0 +1,23 @@
+require val disp_ptr: ptr
+require val priv_stack_offset: int
+require val fst: loc (*first param*)
+require val snd: loc (*second param*)
+require val sp: loc (*rsp*)
+
+require val init_or_not: bool
+
+accesses fst
+
+modifies snd
+modifies sp
+
+pre:
+	*fst = disp_ptr
+
+post:
+	*sp = disp_ptr + priv_stack_offset
+	if init_or_not then
+		*snd = 0
+	else 
+		*snd = 1
+	(* then we will branch to barrelfish_init_disabled *)

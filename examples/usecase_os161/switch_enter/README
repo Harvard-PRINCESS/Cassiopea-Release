@@ -1,0 +1,2 @@
+switch_enter: entry for switchframe_switch
+This makes room for a switchframe on the stack.

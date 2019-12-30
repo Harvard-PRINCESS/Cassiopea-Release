@@ -1,0 +1,7 @@
+(memory GOT: 32 bit 4 len 32 ref)
+(memory dcb_struct: 32 bit 1 len 32 ref)
+(memory dcb: 32 bit 4 len 32 ref)
+([GOT, 0] = [dcb_struct, 0])
+([dcb_struct, 0] = [dcb, 0])
+(R0 = [GOT, 0])
+([dcb, 2] = [GOT, 0])

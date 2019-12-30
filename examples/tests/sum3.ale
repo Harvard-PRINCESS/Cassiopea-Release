@@ -1,0 +1,12 @@
+bind b: ghost_bool
+bind bv1: ghost_vec
+bind bv2: ghost_vec
+bind bv3: ghost_vec
+block sum2 {
+  pre: 
+	(bv1 = get_cont(areareg)) &&
+	(bv2 = get_cont(dispreg)) &&
+	(bv3 = get_cont(resultreg))
+  post:
+    loaded_sum3(bv1, bv2, bv3)
+}

@@ -1,0 +1,5 @@
+Command: Synthesize for spec t09.spec output to t09.out; log to t09.log.raw
+Output to: t09.out
+Log to: t09.log.raw
+Fatal error: exception Failure("t09.casp:1,0-1,22: encountered 0 bit: 0 bit is forbidden!")
+FAILED

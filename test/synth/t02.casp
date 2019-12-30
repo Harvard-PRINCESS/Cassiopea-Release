@@ -1,0 +1,32 @@
+type gpreg = 17 bit loc
+
+letstate irqen: 1 bit loc
+
+letstate r0: 17 bit loc
+letstate r1: 17 bit loc
+
+defop LC rd:gpreg x:17 bit {
+   txt = "", (* "lc " ++ rd.txt ++ ", " ++ x.txt, *)
+   sem = [ *rd <- x ]
+}
+
+defop MTC rs:gpreg {
+   txt = "", (* "mtc " ++ rs.txt, *)
+   sem = [
+      let val: 17 bit = *rs in
+      *irqen <- val[0:1]
+   ]
+}
+
+defop MFC rd:gpreg {
+   txt = "", (* "mfc " ++ rd.txt, *)
+   sem = [
+      let val: 17 bit = bv_to_len(17, *irqen) in
+      *rd <- val
+   ]
+}
+
+defop NOP {
+   txt = "nop",
+   sem = [ skip ]
+}

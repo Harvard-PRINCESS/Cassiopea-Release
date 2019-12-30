@@ -1,0 +1,4 @@
+(* FIXED: github issue #160: out of range pointer accesses *)
+(EQ 0x00000000 0x00000000)
+(SW 0x00000008)
+(SW 0xdeadbeef)

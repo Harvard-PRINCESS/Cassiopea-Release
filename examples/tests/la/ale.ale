@@ -1,0 +1,10 @@
+require type word
+require type gpreg
+require value reg1: gpreg
+require function readptr: (word) word
+block savevals {
+  region M: word bit 4 len word ref
+  pre: true
+  post:
+   ( *reg1 == readptr([M, 0]))
+}

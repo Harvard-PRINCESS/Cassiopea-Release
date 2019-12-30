@@ -1,0 +1,20 @@
+// file: kernel/aarmv7/exception.S
+
+// Macro definition to get pointer to arch-specific dispatcher
+//
+// Logical equivalent of C function with same name
+//
+; .macro get_dispatcher_shared_arm out tmp
+;     load_got \tmp
+;     ldr      \out, dcb_current_idx
+;     ldr      \out, [\tmp, \out]
+;     ldr      \out, [\out]        // out = dcb_current
+;     ldr      \out, [\out, #OFFSETOF_DCB_DISP] //now ptr to dispatcher_shared_arm
+; .endm
+
+
+// r0 -> points to got table entry
+ldr      r2, dcb_current_idx
+ldr      r2, [r0, r2]
+ldr      r2, [r2]        // out = dcb_current
+ldr      r2, [r2, #OFFSETOF_DCB_DISP]

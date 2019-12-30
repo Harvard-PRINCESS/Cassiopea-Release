@@ -1,0 +1,37 @@
+require val flag: reg (*CPSR*)
+require val preflag: reg (*SPSR*)
+require val p1reg: reg (*R0*)
+require val p2reg: reg (*R1*)
+require val p3reg: reg (*R2*)
+require val p4reg: reg (*R3*)
+require val stack_ptr: reg (*SP*)
+
+require val priv_mask: word
+
+accesses stack_ptr
+accesses preflag
+accesses p1reg, p2reg, p3reg, p4reg
+
+modifies stack_ptr
+modifies flag
+(* it may modify p1reg, ..., how to deal with this? *)
+
+let current_sp: word = *stack_ptr
+let p1reg_cont: word = *p1reg
+let p2reg_cont: word = *p2reg
+let p3reg_cont: word = *p3reg
+let p4reg_cont: word = *p4reg
+
+pre:
+	true
+
+post:
+	*MEMORY[current_sp - 4] = p1reg_cont
+	*MEMORY[current_sp - 8] = p2reg_cont
+	*MEMORY[current_sp - 12] = p3reg_cont
+	*MEMORY[current_sp - 16] = p4reg_cont
+	*stack_ptr = current_sp - 16
+	if *preflag && priv_mask then
+		*flag[6] = 0
+	else *flag[6] = 1
+	(* then we will branch (BNE) *)

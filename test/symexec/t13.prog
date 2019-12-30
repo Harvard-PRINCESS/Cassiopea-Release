@@ -1,0 +1,32 @@
+(* Case 1: R1 = 0 *)
+(SETREG R1 0x00000000)
+
+(CMP_imm R1 0x0 0x00 0b1110)
+(ADD_imm R1 R2 0x0 0x05 0b0000)
+(ADD_imm R1 R2 0x0 0x10 0b0001)
+
+(*
+expect result: 
+R1 = 0x0 -> 0x5
+
+Flag set:
+Z (CPSR[30])
+C (CPSR[29])
+CPSR = 0x60000000
+*)
+
+(* Case 2: R1 = 1 *)
+(SETREG R1 0x00000001)
+
+(CMP_imm R1 0x0 0x00 0b1110)
+(ADD_imm R1 R2 0x0 0x05 0b0000)
+(ADD_imm R1 R2 0x0 0x10 0b0001)
+
+(*
+expect result: 
+R1 = 0x1 -> 0x10
+
+Flag set:
+C (CPSR[29])
+CPSR = 0x20000000
+*)

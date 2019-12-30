@@ -1,0 +1,3 @@
+ldrls r1, [r2, #0]
+cmplo r1, lr
+subhi r1, r1, r1

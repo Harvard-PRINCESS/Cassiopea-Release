@@ -1,0 +1,6 @@
+include "t07a.casp";
+
+defop nop2 {
+   txt = "nop2",
+   sem = [ skip ]
+}

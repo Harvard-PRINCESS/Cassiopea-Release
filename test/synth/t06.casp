@@ -1,0 +1,41 @@
+type gpreg = 8 bit loc
+
+letstate irqen: 1 bit loc
+letstate fpuen: 1 bit loc
+letstate bigendian: 1 bit loc
+letstate longmode: 1 bit loc
+
+letstate r0: gpreg
+letstate r1: gpreg
+
+defop LC rd:gpreg x:8 bit {
+   txt = "", (* "lc " ++ rd.txt ++ ", " ++ x.txt, *)
+   sem = [ *rd <- x ]
+}
+
+defop XORI rd:gpreg x:8 bit {
+   txt = "", (* "xor " ++ rd.txt ++ ", " ++ x.txt, *)
+   sem = [ *rd <- *rd ^ x ]
+}
+
+defop MTC rs:gpreg {
+   txt = "", (* "mtc " ++ rs.txt, *)
+   sem = [
+      let val: 8 bit = *rs in
+      *irqen <- val[0:1];
+      *fpuen <- val[1:2];
+      *bigendian <- val[2:3];
+      *longmode <- val[3:4]
+   ]
+}
+
+defop MFC rd:gpreg {
+   txt = "", (* "mfc " ++ rd.txt, *)
+   sem = [
+      let ival: 8 bit = bv_to_len(8, *irqen) in
+      let fval: 8 bit = bv_to_len(8, *fpuen) in
+      let eval: 8 bit = bv_to_len(8, *bigendian) in
+      let lval: 8 bit = bv_to_len(8, *longmode) in
+      *rd <- (lval << 0x03) | (eval << 0x02) | (fval << 0x01) | ival
+   ]
+}

@@ -1,0 +1,56 @@
+CASP=../../cassiopeia
+ALE=../../alewife
+VERIFY_DIR=../evalout/verify
+SYNTH_DIR=../evalout/synth
+
+USECASE=\
+crt0_initregs \
+syscalls_loadnum \
+setjmp \
+longjmp \
+crt0_savevals \
+
+clean:
+	@find . -name "spec.spec" -delete
+
+ale:
+	@echo "---[os/161-mips]---"
+	@for d in $(USECASE); \
+	do \
+		$(ALE) $$d/ale.ale ./map.casp -o $$d/spec.spec; done
+
+interp:
+	@echo "---[os/161-mips]---"
+	@for d in $(USECASE); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASP) ./mips.casp -interp $$d/prog.prog $$d/init.init; done
+
+verify:
+	@echo "---[os/161-mips]---"
+	@for d in $(USECASE); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASP) ./mips.casp -verify $$d/spec.spec $$d/prog.prog; done
+
+synth: 
+	@echo "---[os/161-mips]---"
+	@for d in $(USECASE); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASP) ./mips.casp -synth $$d/spec.spec; done
+
+test:
+	$(ALE) ./latest/ale.ale -o ./latest/spec.spec
+	$(CASP) ./latest/mips.casp -verify ./latest/spec.spec ./latest/prog.prog
+	$(CASP) ./latest/mips.casp -synthnum ./latest/spec.spec 1
+
+# output to files, for evaluation
+verifyout:
+	@echo "---[os/161-mips]---"
+	@for d in $(USECASE); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASP) ./mips.casp -verify $$d/spec.spec $$d/prog.prog -o $(VERIFY_DIR)/verify.os161.mips.$$d.out; done
+
+synthout: 
+	@echo "---[os/161-mips]---"
+	@for d in $(USECASE); do \
+		echo "[[CASE: $$d]]"; \
+		$(CASP) ./mips.casp -synth $$d/spec.spec -o $(SYNTH_DIR)/synth.os161.mips.$$d.out; done

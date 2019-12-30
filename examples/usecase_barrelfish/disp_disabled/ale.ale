@@ -1,0 +1,18 @@
+require value dispreg: reg
+require value outreg: reg
+
+require function disp_disabled: () word
+require function disabled_flgT: () bool
+require function disabled_flgF: () bool
+require function disabled_rescheck: (reg, word) bool
+
+block disp_check_disabled {
+	let mp: ptr = disp_disabled ()
+	let out: vec = read[mp]
+	let b_not_zero: bool = ! (out == (0: wordsize vec))
+
+	pre: ( *dispreg == mp ) && ((out == (0: wordsize vec)) || (out == (1: wordsize vec)))
+	post: disabled_rescheck(outreg, out) &&
+		( !b_not_zero || disabled_flgT() ) &&
+		( b_not_zero || disabled_flgF() )
+}

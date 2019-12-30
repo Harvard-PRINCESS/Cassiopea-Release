@@ -1,0 +1,41 @@
+Regression tests for cassiopeia.
+
+To run, in here do:
+	bmake
+or to parallelize (not enough tests yet to make this worthwhile),
+	bmake -j4
+
+To clean up explicitly, bmake clean.
+
+This will first run all the tests and then print all the test diffs.
+
+Note that any diff output is a "failure"; it indicates a change in
+behavior. Sometimes it means you broke something; sometimes it means
+the reference files need to be updated; sometimes both. Every diff
+should be investigated.
+
+(Managing the program output so as to get good test coverage while
+minimizing the number of nuisance diffs resulting from ordinary
+changes is something of an art and has not been done yet in any way.)
+
+When you have confirmed that all test diffs are intentional changes
+and either harmless or reflect improvements/fixes, you can do "make
+good" to update all the reference files. Don't do this without
+thinking.
+
+************************************************************
+*** It is expected that all changesets pass the tests;   ***
+*** don't commit with broken tests.                      ***
+************************************************************
+
+
+If we end up needing multiple levels of reference files to cope with
+intentional temporary regressions, let me know; I've been there on
+other projects and it can be handled.
+
+The framework requires bmake. (gmake doesn't cut it.) bmake is good
+for this kind of test automation.
+	% wc -l mk/*.mk | grep total
+	     175 total
+
+- dholland 5/30/2018

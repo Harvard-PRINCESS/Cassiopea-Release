@@ -1,0 +1,12 @@
+require val kernal_stack: int
+require val kernal_stack_size: int
+require val kernal_stack_ptr: ptr
+require val stack_ptr: reg (*SP*)
+
+modifies stack_ptr
+
+pre:
+	true
+
+post:
+	*stack_ptr = kernel_stack_ptr + kernal_stack + kernel_stack_size

@@ -1,0 +1,22 @@
+require val exception_mode_code: int
+require val stack_top_for_exception_mode: ptr
+require val flag: reg (*CPSR*)
+require val p1reg: reg (*R0*)
+require val p2reg: reg (*R1*)
+require val stack_ptr_list: regset (*SP list: contains abt_stack_ptr, irq_stack_ptr, fiq_stack_ptr, undef_stack_ptr*)
+
+accesses flag
+accesses p1reg, p2reg
+
+modifies flag
+modifies stack_ptr_list
+
+let current_flag: word = *flag
+
+pre:
+	*p1reg = exception_mode_code
+	*p2reg = stack_top_for_exception_mode
+
+post:
+	*stack_ptr_list[exception_mode_code]= stack_top_for_exception_mode
+	*flag = current_flag

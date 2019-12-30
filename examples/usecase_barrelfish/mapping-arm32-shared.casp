@@ -1,0 +1,15 @@
+let outreg: register = R1
+let dispreg: register = R2
+let pcreg: register = R14
+
+def disabled_flgT -> bool = ( *C == 0b1)
+def disabled_flgF -> bool = ( *C == 0b0)
+
+def critlow_flgT -> bool = !( *Z == 0b0 && *C == 0b1)
+def critlow_flgF -> bool = ( *Z == 0b0 && *C == 0b1)
+
+def crithigh_flgT -> bool = ( *C == 0b0)
+def crithigh_flgF -> bool = !( *C == 0b0)
+
+def enabled_flag -> bool = ( *Z == 0b1)
+def disabled_flag -> bool = ( *Z == 0b0)

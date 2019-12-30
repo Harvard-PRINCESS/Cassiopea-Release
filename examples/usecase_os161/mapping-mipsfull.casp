@@ -1,0 +1,106 @@
+(********** alewife mappings **********)
+module longjmp_full {
+    include "mapping-mips-jmpbuf-shared.casp";
+	let pre_r29: 32 bit = fetch [bufptr b+ r29_slot, 32]
+	let pre_r31: 32 bit = fetch [bufptr b+ r31_slot, 32]
+	let pre_r16: 32 bit = fetch [bufptr b+ r16_slot, 32]
+	let pre_r17: 32 bit = fetch [bufptr b+ r17_slot, 32]
+	let pre_r18: 32 bit = fetch [bufptr b+ r18_slot, 32]
+	let pre_r19: 32 bit = fetch [bufptr b+ r19_slot, 32]
+	let pre_r20: 32 bit = fetch [bufptr b+ r20_slot, 32]
+	let pre_r21: 32 bit = fetch [bufptr b+ r21_slot, 32]
+	let pre_r22: 32 bit = fetch [bufptr b+ r22_slot, 32]
+	let pre_r23: 32 bit = fetch [bufptr b+ r23_slot, 32]
+	let pre_r30: 32 bit = fetch [bufptr b+ r30_slot, 32]
+	def jmp_bufloaded -> bool =
+	   *r29 == pre_r29 &&
+	   *r31 == pre_r31 &&
+	   *r16 == pre_r16 &&
+	   *r17 == pre_r17 &&
+	   *r18 == pre_r18 &&
+	   *r19 == pre_r19 &&
+	   *r20 == pre_r20 &&
+	   *r21 == pre_r21 &&
+	   *r22 == pre_r22 &&
+	   *r23 == pre_r23 &&
+	   *r30 == pre_r30
+}
+
+module setjmp_full {
+    include "mapping-mips-jmpbuf-shared.casp";
+	let pre_r29: 32 bit = *r29
+	let pre_r31: 32 bit = *r31
+	let pre_r16: 32 bit = *r16
+	let pre_r17: 32 bit = *r17
+	let pre_r18: 32 bit = *r18
+	let pre_r19: 32 bit = *r19
+	let pre_r20: 32 bit = *r20
+	let pre_r21: 32 bit = *r21
+	let pre_r22: 32 bit = *r22
+	let pre_r23: 32 bit = *r23
+	let pre_r30: 32 bit = *r30
+	def jmp_bufsaved (bufptr: word) -> bool =
+	   fetch [bufptr b+ r29_slot, 32] == pre_r29 &&
+	   fetch [bufptr b+ r31_slot, 32] == pre_r31 &&
+	   fetch [bufptr b+ r16_slot, 32] == pre_r16 &&
+	   fetch [bufptr b+ r17_slot, 32] == pre_r17 &&
+	   fetch [bufptr b+ r18_slot, 32] == pre_r18 &&
+	   fetch [bufptr b+ r19_slot, 32] == pre_r19 &&
+	   fetch [bufptr b+ r20_slot, 32] == pre_r20 &&
+	   fetch [bufptr b+ r21_slot, 32] == pre_r21 &&
+	   fetch [bufptr b+ r22_slot, 32] == pre_r22 &&
+	   fetch [bufptr b+ r23_slot, 32] == pre_r23 &&
+	   fetch [bufptr b+ r30_slot, 32] == pre_r30
+}
+
+module switch_all {
+	(* full context switch *)
+	include "mapping-mips-switch-shared.casp";
+	let old_r16: 32 bit = *r16 (* s0 *)
+	let old_r17: 32 bit = *r17 (* s1 *)
+	let old_r18: 32 bit = *r18 (* s2 *)
+	let old_r19: 32 bit = *r19 (* s3 *)
+	let old_r20: 32 bit = *r20 (* s4 *)
+	let old_r21: 32 bit = *r21 (* s5 *)
+	let old_r22: 32 bit = *r22 (* s6 *)
+	let old_r23: 32 bit = *r23 (* s7 *)
+	let old_r28: 32 bit = *r28 (* gp *)
+	let old_r30: 32 bit = *r30 (* s8/fp *)
+	let old_r31: 32 bit = *r31 (* ra *)
+    def switchframe_saved -> bool =
+	   fetch [oldframe_base b+ 0x00000000, 32] == old_r16 &&
+	   fetch [oldframe_base b+ 0x00000004, 32] == old_r17 &&
+	   fetch [oldframe_base b+ 0x00000008, 32] == old_r18 &&
+	   fetch [oldframe_base b+ 0x0000000c, 32] == old_r19 &&
+	   fetch [oldframe_base b+ 0x00000010, 32] == old_r20 &&
+	   fetch [oldframe_base b+ 0x00000014, 32] == old_r21 &&
+	   fetch [oldframe_base b+ 0x00000018, 32] == old_r22 &&
+	   fetch [oldframe_base b+ 0x0000001c, 32] == old_r23 &&
+	   fetch [oldframe_base b+ 0x00000020, 32] == old_r28 &&
+	   fetch [oldframe_base b+ 0x00000024, 32] == old_r30 &&
+	   fetch [oldframe_base b+ 0x00000028, 32] == old_r31
+
+	let new_r16: word = fetch [newframe_base b+ 0x00000000, 32]
+	let new_r17: word = fetch [newframe_base b+ 0x00000004, 32]
+	let new_r18: word = fetch [newframe_base b+ 0x00000008, 32]
+	let new_r19: word = fetch [newframe_base b+ 0x0000000c, 32]
+	let new_r20: word = fetch [newframe_base b+ 0x00000010, 32]
+	let new_r21: word = fetch [newframe_base b+ 0x00000014, 32]
+	let new_r22: word = fetch [newframe_base b+ 0x00000018, 32]
+	let new_r23: word = fetch [newframe_base b+ 0x0000001c, 32]
+	let new_r28: word = fetch [newframe_base b+ 0x00000020, 32]
+	let new_r30: word = fetch [newframe_base b+ 0x00000024, 32]
+	let new_r31: word = fetch [newframe_base b+ 0x00000028, 32]
+    def switchframe_loaded -> bool =
+	   *r16 == new_r16 && (* s0 *)
+	   *r17 == new_r17 && (* s1 *)
+	   *r18 == new_r18 && (* s2 *)
+	   *r19 == new_r19 && (* s3 *)
+	   *r20 == new_r20 && (* s4 *)
+	   *r21 == new_r21 && (* s5 *)
+	   *r22 == new_r22 && (* s6 *)
+	   *r23 == new_r23 && (* s7 *)
+	   *r28 == new_r28 && (* gp *)
+	   *r30 == new_r30 && (* s8/fp *)
+	   *r31 == new_r31    (* ra *)
+}

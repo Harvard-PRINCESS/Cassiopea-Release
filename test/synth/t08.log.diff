@@ -1,0 +1,9 @@
+--- t08.log.good	2019-12-16 13:59:49.422495993 -0800
++++ t08.log	2019-12-30 10:21:57.192698746 -0800
+@@ -1,3 +1,5 @@
+-Command: Synthesize for spec t08.spec and output to t08.out, log to t08.log.raw
++Command: Synthesize for spec t08.spec output to t08.out; log to t08.log.raw
++Output to: t08.out
++Log to: t08.log.raw
+ Fatal error: exception Failure("t08.casp:1,0-1,22: encountered 0 bit: 0 bit is forbidden!")
+ FAILED

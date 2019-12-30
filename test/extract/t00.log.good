@@ -1,0 +1,2 @@
+Command: Extract ASM from t00.prog and output to t00.out, log to <stdout>
+	Execution Time: 0.000969s

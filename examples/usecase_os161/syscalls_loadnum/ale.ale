@@ -1,0 +1,7 @@
+require value callnum: word
+require value syscall_callnum_reg: reg
+
+block syscalls_loadnum {
+	pre: true
+	post: *syscall_callnum_reg == callnum
+}

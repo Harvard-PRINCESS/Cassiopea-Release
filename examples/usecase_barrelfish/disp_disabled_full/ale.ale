@@ -1,0 +1,11 @@
+require value dispreg: reg
+require value pcreg: reg
+require value outreg: reg
+provide function is_zero_or_one (w: word) : bool = (w == wordzero) || (w == wordone)
+
+block disp_disabled_full {
+
+	pre: true
+
+	post: true
+}

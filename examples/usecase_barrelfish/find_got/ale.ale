@@ -1,0 +1,15 @@
+require value gotreg: reg
+require value picreg: reg
+require value stack_got_prel: word
+require value stack_got_offset: word
+require value got_org: word
+require value STACKLEN: int
+require function get_stack_addr: (word, word) word
+
+block find_opt {
+	region stack: wordsize bit STACKLEN len wordsize ref
+	pre: 
+		*gotreg == stack_got_prel && 
+		fetch[stack_got_prel] == ???
+	post: *picreg == ???
+}

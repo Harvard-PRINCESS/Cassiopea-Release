@@ -1,0 +1,46 @@
+--- t04.log.good	2019-12-16 13:59:49.418496036 -0800
++++ t04.log	2019-12-30 10:21:56.200694602 -0800
+@@ -7,12 +7,13 @@
+  * prog : files containing a list of instructions
+  * spec : files containing pre-/post-condition specs
+ The following describes flags and possible commands with their expected arguments:
+-  -interp [prog] [init] : interpret prog file with state state
+-  -verify [spec] [prog]: verify prog against spec
+-  -synth [spec]: synthesize prog from spec
+-  -sketch [spec] [sketch]: synthesize prog from spec with sketch
+-  -deduce [spec]: synthesize prog from spec
+-  -extract [prog] : extract ASM from prog file
++  -interp [prog] [init]: interpret [prog] on starting state [init]
++  -verify [spec] [prog]: verify [prog] against [spec]
++  -synth [spec]: synthesize prog from [spec]
++  -sketch [spec] [sketch]: synthesize prog from [spec] with [sketch]
++  -deduce [spec] : synthesize prog from [spec]
++  -extract [prog] : extract ASM from [prog]
++  -bitsize : show approximate per-instruction search space size
+   -o : set file for result output
+   -l : set file for logging
+   -smt : set file for smtlib dump
+@@ -20,14 +21,19 @@
+   --debug : enable debug logging mode
+   --dump-interp : dump interpreter function calls
+   --dump-solver : dump solver interaction
+-  --use-cex-solver : set verification solver (z3, btor, yices) (z3 by default)
+-  --use-syn-solver : set synthesis solver (z3, btor, yices) (btor by default)
++  --dry-run : cause CEGIS to always fail
+   --max-insts : maximum instructions (default 4)
+-  --bucketed : synthesis with counter-example buckets
+-  --accumulation : synthesis with candidate accumulation
++  --bucketed : synthesis with counter-example bucketing
++  --accumulation-direct : synthesis with fine-grained candidate accumulation, 
++  --accumulation-operation : synthesis with coarse-grained candidate accumulation, at operation level
++  --accumulation-category : synthesis with coarse-grained candidate accumulation, at category level
+   --sorting : synthesis with assembly instruction sorting
++  --weak-coerce : use weaker coercion
+   --no-unify : disable equality unification for specifications
++  --no-depend : disable dependency assertions
+   --no-branch : disable branching
++  --use-cex-solver : set verification solver (z3, btor, yices) (z3 by default)
++  --use-syn-solver : set synthesis solver (z3, btor, yices) (btor by default)
+   --seed : set random seed for whitening and SMT solver
+   --whiten : whiten [solver, logic, insts, args]
+   -help  Display this list of options

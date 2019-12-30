@@ -1,0 +1,5 @@
+(MOVaddr_reg_off RDI RIP 0)
+(MOVaddr_reg_off RDI RDI 8)
+
+(*  mov dcb_current(%rip), %rdi
+    mov OFFSETOF_DCB_DISP(%rdi), %rdi *)

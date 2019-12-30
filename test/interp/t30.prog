@@ -1,0 +1,2 @@
+(* github issue #158 - memory initialization *)
+(EQ 0xdeadbeef 0xfadecafe)

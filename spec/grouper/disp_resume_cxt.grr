@@ -1,0 +1,54 @@
+# grouper file for dispatcher resume context 
+
+proc disp_resumr_cxt () {
+	
+	# declare the locations we can refer to: registers and linker symbols
+	places {
+		register register_list_ptr;
+		register disp_reg;
+		register cpsr_reg;
+		list(register) disp_save_regs;	
+	}
+
+	state {
+		var regls: pointer _;
+		var dispv: pointer _;
+	}
+
+   # initial state - pre condition
+	init {
+		add Cdisp: *disp_reg = *dispv;
+		add Cregls: regls = *register_list_ptr;
+	}
+
+	body {
+		# mov r2, #0
+        # str r2, [r0, # " XTR(OFFSETOF_DISP_DISABLED) "]
+        step {
+        	use Cdisp, disp_reg;
+        	add Cdisp: M[*disp_reg+disabledoffset] = 0;
+        }
+
+		# ldr r0, [r1], #4
+		cxt_switch {
+			use Cregls, regls, disp_reg;
+			add Mdisp: *disp_reg = M[*regls+4];
+		}
+
+		# msr cpsr, r0
+		step {
+			use disp_reg, cpsr_reg;
+			add Ccpsr: *cpsr_reg = *disp_reg;
+		}
+
+		# ldmia r1, {r0-r15}
+		cxt_switch {
+			use Cregls, regls, disp_save_regs;
+			# post condition: cxt loaded from the memory
+			add Msave: 
+				forall r in disp_save_regs, *r = M[*regls+ioffset];
+		}
+
+	}
+
+}

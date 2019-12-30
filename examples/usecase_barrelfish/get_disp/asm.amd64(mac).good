@@ -1,0 +1,2 @@
+mov (%rip), %rdi
+mov 8(%rdi), %rdi

@@ -1,0 +1,4 @@
+(memory buf: 32 bit 11 len 32 ref)
+(R0 = [buf, 0])
+(R1 = 0x00000000)
+(* (r1 = 10) gets the other case *)

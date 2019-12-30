@@ -1,0 +1,13 @@
+require value wordsize: int
+require value reg_arg_retval: reg
+require value reg_retval: reg
+
+block longjmp_ret {
+	let retval: vec = *reg_arg_retval
+	pre: true
+	post:
+		if retval == (0: wordsize vec) then 
+			*reg_retval == (1: wordsize vec)
+		else 
+			*reg_retval == retval
+}

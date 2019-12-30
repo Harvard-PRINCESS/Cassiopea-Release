@@ -1,0 +1,42 @@
+Command: Interpret prog t13.prog with start state t13.init and output to <stdout>, log to <stdout>
+concrete execution succeeded
+Interp results:
+MEMORY:
+============
+
+REGISTERS:
+============
+CPSR : bv:0x20000000 : 32 len
+PC : bv:0x00000000 : 32 len
+R0 : bv:0x00000000 : 32 len
+R1 : bv:0x00000010 : 32 len
+R10 : bv:0x00000000 : 32 len
+R11 : bv:0x00000000 : 32 len
+R12 : bv:0x00000000 : 32 len
+R13 : bv:0x00000000 : 32 len
+R13_svc : bv:0x00000000 : 32 len
+R14 : bv:0x00000000 : 32 len
+R14_svc : bv:0x00000000 : 32 len
+R2 : bv:0x00000000 : 32 len
+R3 : bv:0x00000000 : 32 len
+R4 : bv:0x00000000 : 32 len
+R5 : bv:0x00000000 : 32 len
+R6 : bv:0x00000000 : 32 len
+R7 : bv:0x00000000 : 32 len
+R8 : bv:0x00000000 : 32 len
+R9 : bv:0x00000000 : 32 len
+SPSR : bv:0x00000000 : 32 len
+CONTEXT:
+============
+
+NEXT PC:
+============
+int:3
+Read/Write register sets for each instruction: 
+rd: CPSR R1
+wt: CPSR
+rd: CPSR R2
+wt: R1
+rd: CPSR R2
+wt: R1
+	Execution Time: 0.004814s

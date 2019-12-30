@@ -1,0 +1,7 @@
+(memory stack1: 32 bit 11 len 32 ref)
+(memory stack2: 32 bit 11 len 32 ref)
+(memory thread: 32 bit 2 len 32 ref)
+(r4 = [thread, 0])
+(r5 = [thread, 1])
+([thread, 1] = [stack2, 0])
+(r29 = [stack1, 10])

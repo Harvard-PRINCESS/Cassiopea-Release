@@ -1,0 +1,6 @@
+Command: Synthesize for spec t00.spec and output to t00.out, log to t00.log.raw
+Iter 1 Guessing...	Guessing Time: ???s
+Iter 1 Checking...	Checking Time: ???s
+Synthesis with 0 insts succeeded! Prog:
+
+	Execution Time: ???s

@@ -1,0 +1,14 @@
+letstate z0: 0 bit loc
+letstate z1: 0 bit loc
+
+(*
+defop NOP {
+   txt = "nop",
+   sem = [ skip ]
+}
+*)
+
+defop BOO {
+   txt = "boo",
+   sem = [ *z0 <- *z1 ]
+}

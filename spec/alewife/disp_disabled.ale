@@ -1,0 +1,28 @@
+require val offsetof_disp_disabled: int
+require val offsetof_disp_crit_pc_low: int
+require val offsetof_disp_crit_pc_high: int
+require val offsetof_disp_enabled_area: int
+require val offsetof_disp_disabled_area: int
+require val disp_ptr: ptr
+
+require val disp: reg
+require val ret: reg
+require val pc: reg
+
+accesses disp
+accesses pc
+
+modifies ret
+
+pre:
+	*disp = disp_ptr
+
+post:
+	if MEMORY(disp_ptr + offsetof_disp_disabled) = 1 then
+		*ret = disp_ptr + offsetof_disp_disabled_area
+	else 
+		if (MEMORY(disp_ptr + offsetof_disp_crit_pc_low) <= *pc) && 
+		   (MEMORY(disp_ptr + offsetof_disp_crit_pc_high) > *pc) then
+				*ret = disp_ptr + offsetof_disp_disabled_area
+		else
+			*ret = disp_ptr + offsetof_disp_enabled_area

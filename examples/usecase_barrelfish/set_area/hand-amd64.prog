@@ -1,0 +1,5 @@
+(*assume OFFSETOF_DISP_ENABLED_AREA = 0x5*)
+(LEA_imm_reg_reg RCX RCX 5)
+(CMP_reg_imm RBX 0x00000000)
+(JE 0x01)
+(LEA_imm_reg_reg RCX RCX 11)

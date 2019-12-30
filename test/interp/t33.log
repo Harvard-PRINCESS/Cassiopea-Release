@@ -1,0 +1,6 @@
+Command: Interpret prog t33.prog with start state t33.init output to <stdout>; log to <stdout>
+Output to: 
+Log to: 
+Fatal error: exception Failure("concrete execution failed at t33.casp:15,6-15,28 with error: store: no memory defined")
+Fatal error: exception Failure("concrete execution failed at t33.casp:15,6-15,28 with error: store: no memory defined")
+FAILED

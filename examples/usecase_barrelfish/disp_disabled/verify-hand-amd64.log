@@ -1,0 +1,5 @@
+Command: Verify prog hand-amd64.prog against spec spec-amd64.spec output to verify-hand-amd64.out; log to verify-hand-amd64.log
+Output to: verify-hand-amd64.out
+Log to: verify-hand-amd64.log
+Verification succeeded!
+	Execution Time: 0.026173s

@@ -1,0 +1,17 @@
+letstate allmem: 8 bit 4 len 8 ref memory
+letstate r0: 8 bit loc
+letstate r1: 8 bit loc
+
+defop LC  rd: 8 bit loc  c: 8 bit  {
+	txt = "", (* txt = "lc " ++ rd.txt ++ ", " ++ c.txt, *)
+   sem = [
+      *rd <- c
+   ]
+}
+
+defop SW  rs: 8 bit loc  addr: 8 bit loc  {
+	txt = "", (* txt = "sw " ++ rs.txt ++ ", " ++ addr.txt, *)
+   sem = [
+      store[*addr, 8] <- *rs
+   ]
+}

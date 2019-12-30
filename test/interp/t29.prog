@@ -1,0 +1,2 @@
+(* FIXED: from github issue #146, now exhibits #161 *)
+(EQ 0x20 0x21)

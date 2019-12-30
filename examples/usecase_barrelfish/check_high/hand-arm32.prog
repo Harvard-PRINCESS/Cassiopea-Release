@@ -1,0 +1,4 @@
+(LDR_imm R1 R2 0x000 0b1110)
+(CMP_reg R14 R1 0b1110)
+(MOV_imm R1 0x0 0x01 0b0011)
+(MOV_imm R1 0x0 0x00 0b0010)

@@ -1,0 +1,57 @@
+Command: Verify prog t03.prog against spec t03.spec and output to t03.out, log to t03.log.raw
+Verification failed!
+With counterexample:
+INITIAL:
+MEMORY:
+============
+
+REGISTERS:
+============
+ctl_ie : (bitvec bv_1$42) : 1 len
+ctl_um : (bitvec bv_1$43) : 1 len
+flag : (bitvec bv_1$44) : 1 len
+imask : (bitvec bv_4$45) : 4 len
+mir : (bitvec bv_1$46) : 1 len
+mirctl_ie : (bitvec bv_1$47) : 1 len
+mirctl_ipend : (bitvec bv_4$48) : 4 len
+mirctl_um : (bitvec bv_1$49) : 1 len
+mirctl_xcode : (bitvec bv_2$50) : 2 len
+mirpc : (bitvec bv_8$51) : 8 len
+r0 : (bitvec 0x00) : 8 len
+r1 : (bitvec 0x20) : 8 len
+r2 : (bitvec 0xff) : 8 len
+r3 : (bitvec 0x02) : 8 len
+CONTEXT:
+============
+()
+NEXT PC:
+============
+0
+FINAL:
+MEMORY:
+============
+
+REGISTERS:
+============
+ctl_ie : (bitvec bv_1$42) : 1 len
+ctl_um : (bitvec bv_1$43) : 1 len
+flag : (bitvec bv_1$44) : 1 len
+imask : (bitvec bv_4$45) : 4 len
+mir : (bitvec bv_1$46) : 1 len
+mirctl_ie : (bitvec bv_1$47) : 1 len
+mirctl_ipend : (bitvec bv_4$48) : 4 len
+mirctl_um : (bitvec bv_1$49) : 1 len
+mirctl_xcode : (bitvec bv_2$50) : 2 len
+mirpc : (bitvec bv_8$51) : 8 len
+r0 : (bitvec 0x21) : 8 len
+r1 : (bitvec 0x21) : 8 len
+r2 : (bitvec 0x01) : 8 len
+r3 : (bitvec 0x02) : 8 len
+CONTEXT:
+============
+(true)
+NEXT PC:
+============
+3
+	Execution Time: ???s
+FAILED

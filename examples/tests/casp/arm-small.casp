@@ -1,0 +1,102 @@
+type word = 32 bit
+type halfword = 16 bit
+type doubleword = 64 bit
+type byte = 8 bit
+type register = word loc
+type doubleregister = doubleword loc
+type cond_field = 4 bit
+type rotate_imm4 = 4 bit
+type imm8 = 8 bit
+type imm12 = 12 bit
+type imm5 = 5 bit
+type flg = 1 bit loc
+
+(*CPSR current program status register*)
+letstate N: flg (* CPSR[31] *)
+letstate Z: flg (* CPSR[30] *)
+letstate C: flg (* CPSR[29] *)
+letstate V: flg (* CPSR[28] *)
+letstate R0: register  (* first function argument *)
+letstate R1: register  (* second function argument *)
+letstate M: 32 bit 4 len 32 ref memory
+
+let resultreg: register = R1
+let areareg: register = R0
+
+def get_cont r: register -> word = *r
+
+(* add1.ale *)
+def loaded_add1 biv: word -> bool = 
+	let dR1: word = *resultreg in
+		(dR1 == biv b+ 0x00000001)
+
+(* add2.ale *)
+def loaded_add2 biv: word -> bool = 
+	let dR1: word = *resultreg in
+	let dR0: word = *areareg in
+	(dR1 == biv b+ 0x00000001) && (dR0 == biv b+ 0x00000004)
+
+(********** cassiopeia functions **********)
+
+def arm32_checkcond op: cond_field -> bool =
+	let N_bit: bool = ( *N == 0b1) in
+	let Z_bit: bool = ( *Z == 0b1) in
+	let C_bit: bool = ( *C == 0b1) in
+	let V_bit: bool = ( *V == 0b1) in
+	let C_not_Z: bool = C_bit && !Z_bit in
+	let N_eq_V: bool = N_bit == V_bit in
+	let not_Z_N_eq_V: bool = !Z_bit && N_eq_V in
+
+	switch op: cond_field with
+		case 0b0000 -> Z_bit? true: false
+		case 0b0001 -> Z_bit? false: true
+		case 0b0010 -> C_bit? true: false
+		case 0b0011 -> C_bit? false: true
+		case 0b0100 -> N_bit? true: false
+		case 0b0101 -> N_bit? false: true
+		case 0b0110 -> V_bit? true: false
+		case 0b0111 -> V_bit? false: true
+		case 0b1000 -> C_not_Z? true: false
+		case 0b1001 -> C_not_Z? false: true
+		case 0b1010 -> N_eq_V? true: false
+		case 0b1011 -> N_eq_V? false: true
+		case 0b1100 -> not_Z_N_eq_V? true: false
+		case 0b1101 -> not_Z_N_eq_V? false: true
+		case 0b1110 -> true
+		case _ -> true
+	end
+
+def arm32_getRotationImm r4: rotate_imm4 i8: imm8 -> word =
+	let i8_word: word = bv_to_len(32, i8) in
+	let r4_word: word = bv_to_len(32, r4) in
+	let rr_word: word = r4_word b+ r4_word in (* r4 * 2 *)
+	let rl_word: word = 0x00000020 b- rr_word in (* 32 - (r4 * 2) *)
+	let Imm_sh1: word = i8_word >> rr_word in
+	let Imm_sh2: word = i8_word << rl_word in
+	Imm_sh1 | Imm_sh2
+
+defop ADD_imm Rd: register Rn: register Rotate_imm: rotate_imm4 Imm: imm8 Cond: cond_field {
+	txt = "add".armcc(Cond) ++ Rd.txt ++ "," ++ Rn.txt ++ "," ++ Rotate_imm.txt ++ "," ++ Imm.txt, (*ADD.cond Rd, Rn, #Rotate+Imm*)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+			*Rd <- *Rn b+ arm32_getRotationImm(Rotate_imm, Imm)
+		else 
+			skip
+	]
+}
+
+(*word: register offset pre-indexed*)
+defop LDR_reg Rd: register Rn: register Rm: register Cond: cond_field {
+	txt = "ldr".armcc(Cond) ++ Rd.txt ++ "," ++ "[" ++ Rn.txt ++ "," ++ Rm.txt ++ "]", (*LDR.cond Rd, [Rn, Rm]*)
+	sem = [
+		let Cond_passed: bool = arm32_checkcond(Cond) in
+		if Cond_passed then
+		(
+			let out: word = *Rn b+ *Rm in
+			*Rd <- read[out, 32]
+		)
+		else
+			skip
+	]
+}

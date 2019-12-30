@@ -1,0 +1,3 @@
+(*assume OFFSETOF_DISP_DISABLED = 0*)
+(*(SETREG RCX [M, 0])*)
+(CMPL_imm_imm_reg RCX 0x00000000 0)
