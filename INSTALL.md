@@ -2,6 +2,8 @@
 
 OCaml version 4.06.x
 BSD make (bmake in linux distribu†ions, used for running tests)
+Boolector 3.1.0 with CaDiCal, Lingeling, minisat (unsupported on macos)
+z3
 
 {macos}
 ```
@@ -58,28 +60,29 @@ eval $(opam env)
 # Verification and Synthesis
 
 For verification and synthesis, Cassiopea expects an SMT solver in {boolector,Z3,yices} to be
-in your path. We recommend boolector or yices for performance or Z3 for ease of installation
+in your path. We recommend boolector or yices for performance or Z3 for ease of installation and compatibility.
 
 ## boolector download
 
-    # Download and build Boolector
-    git clone https://github.com/boolector/boolector
+    # Download and build Boolector 3.1.0
+    git clone --branch 3.1.0 https://github.com/boolector/boolector
     cd boolector
 
-    # Download and build Lingeling
-    ./contrib/setup-lingeling.sh
-
-    # Download and build BTOR2Tools
-    ./contrib/setup-btor2tools.sh
+    # Download and build Lingeling, CaDiCal, minisat
+    ./contrib/setup-all.sh
 
     # Build Boolector and install
     ./configure.sh && cd build && make && sudo make install
+
+# Boolector on macos is not currently supported
 
 ## Z3
 
 Ubuntu:
 
 sudo apt-get install z3
+
+**Known Issue: z3 4.4.1 throws memory errors when used with Cassiopea. If possible, build and/or install a v4.8 variant**
 
 Macos:
 

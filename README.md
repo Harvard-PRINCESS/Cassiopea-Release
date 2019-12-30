@@ -72,10 +72,13 @@ The following describes flags and possible commands with their expected argument
   --dry-run : cause CEGIS to always fail
   --max-insts : maximum instructions (default 4)
   --bucketed : synthesis with counter-example bucketing
-  --accumulation : synthesis with candidate accumulation
+  --accumulation-direct : synthesis with fine-grained candidate accumulation,
+  --accumulation-operation : synthesis with coarse-grained candidate accumulation, at operation level
+  --accumulation-category : synthesis with coarse-grained candidate accumulation, at category level
   --sorting : synthesis with assembly instruction sorting
   --weak-coerce : use weaker coercion
   --no-unify : disable equality unification for specifications
+  --no-depend : disable dependency assertions
   --no-branch : disable branching
   --use-cex-solver : set verification solver (z3, btor, yices) (z3 by default)
   --use-syn-solver : set synthesis solver (z3, btor, yices) (btor by default)
@@ -169,7 +172,7 @@ lw $gp, 8($gp)
 ```
 
 # IMPORTANT!
-Depending on the performance of z3 on your machine, expect a full run to take between 3 and ?? hours.
+Depending on the performance of z3 on your machine, expect a full run to take between 10 minutes and several hours.
 
 ## Contact:
 
